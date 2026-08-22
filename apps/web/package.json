@@ -1,0 +1,35 @@
+{
+  "name": "@internship-copilot/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@internship-copilot/ai": "workspace:*",
+    "@internship-copilot/config": "workspace:*",
+    "@internship-copilot/database": "workspace:*",
+    "@internship-copilot/types": "workspace:*",
+    "@internship-copilot/validation": "workspace:*",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.479.0",
+    "next": "^15.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.54.2",
+    "tailwind-merge": "^3.0.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.2"
+  }
+}

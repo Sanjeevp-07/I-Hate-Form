@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Same Origin Iframe Fixture</title>
+</head>
+<body>
+  <h1>Parent Application Page</h1>
+  <form id="parent-form">
+    <label for="applicant-name">Full Name</label>
+    <input type="text" id="applicant-name" name="name" required />
+  </form>
+
+  <iframe id="embedded-frame" srcdoc='
+    <html>
+      <body>
+        <h3>Embedded Same-Origin Form Frame</h3>
+        <form id="child-form">
+          <label for="child-email">Email Address</label>
+          <input type="email" id="child-email" name="email" required />
+          <label for="child-phone">Phone Number</label>
+          <input type="tel" id="child-phone" name="phone" />
+        </form>
+      </body>
+    </html>
+  ' style="width: 100%; height: 300px; border: 1px solid #ccc;"></iframe>
+</body>
+</html>

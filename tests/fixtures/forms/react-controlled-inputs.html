@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>React Controlled Component Simulation</title>
+</head>
+<body>
+  <h1>Framework Controlled Inputs</h1>
+  <form id="framework-form">
+    <div>
+      <label for="controlled-name">Full Name</label>
+      <input type="text" id="controlled-name" name="name" />
+      <span id="registered-state" style="color: red;">State: EMPTY</span>
+    </div>
+  </form>
+
+  <script>
+    const input = document.getElementById("controlled-name");
+    const stateDisplay = document.getElementById("registered-state");
+
+    // Framework event listener (simulates React onChange / Vue v-model)
+    input.addEventListener("input", (e) => {
+      stateDisplay.textContent = `State: REGISTERED (${e.target.value})`;
+      stateDisplay.style.color = "green";
+    });
+  </script>
+</body>
+</html>

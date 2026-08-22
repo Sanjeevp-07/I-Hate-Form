@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Open Shadow DOM Fixture</title>
+</head>
+<body>
+  <h1>Custom Web Components (Open Shadow Root)</h1>
+  <div id="host-element"></div>
+
+  <script>
+    const host = document.getElementById("host-element");
+    const shadow = host.attachShadow({ mode: "open" });
+    shadow.innerHTML = `
+      <div class="shadow-container">
+        <h3>Workday-style Shadow Component</h3>
+        <label for="shadow-first-name">First Name</label>
+        <input type="text" id="shadow-first-name" name="firstName" required />
+
+        <label for="shadow-last-name">Last Name</label>
+        <input type="text" id="shadow-last-name" name="lastName" required />
+      </div>
+    `;
+  </script>
+</body>
+</html>

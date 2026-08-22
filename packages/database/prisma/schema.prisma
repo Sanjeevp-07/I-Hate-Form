@@ -1,0 +1,251 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String          @id @default(uuid())
+  email        String          @unique
+  authProvider String          @default("email")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  profile         Profile?
+  documents       Document[]
+  applications    Application[]
+  fieldMappings   FieldMapping[]
+  aiInteractions  AIInteraction[]
+  preferences     UserPreference?
+  auditLogs       AuditLog[]
+}
+
+model Profile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  personal  Json     // PersonalInfo object
+  links     Json     // ProfileLinks object
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  educations     Education[]
+  experiences    Experience[]
+  projects       Project[]
+  skills         Skill[]
+  achievements   Achievement[]
+  certifications Certification[]
+}
+
+model Education {
+  id           String    @id @default(uuid())
+  profileId    String
+  profile      Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  institution  String
+  degree       String
+  fieldOfStudy String
+  gpa          Float?
+  startDate    String
+  endDate      String?
+  isCurrent    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+}
+
+model Experience {
+  id          String    @id @default(uuid())
+  profileId   String
+  profile     Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  company     String
+  title       String
+  location    String?
+  startDate   String
+  endDate     String?
+  isCurrent   Boolean   @default(false)
+  description String    @db.Text
+  skills      String[]  @default([])
+  createdAt   DateTime  @default(now())
+}
+
+model Project {
+  id           String   @id @default(uuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name         String
+  description  String   @db.Text
+  technologies String[] @default([])
+  url          String?
+  repoUrl      String?
+  createdAt    DateTime @default(now())
+}
+
+model Skill {
+  id          String   @id @default(uuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  category    String
+  name        String
+  proficiency String?
+  createdAt   DateTime @default(now())
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title       String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+}
+
+model Certification {
+  id          String   @id @default(uuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name        String
+  issuer      String
+  issueDate   String?
+  url         String?
+  createdAt   DateTime @default(now())
+}
+
+enum DocumentType {
+  RESUME
+  COVER_LETTER
+  TRANSCRIPT
+  CERTIFICATE
+  PORTFOLIO
+}
+
+model Document {
+  id         String       @id @default(uuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       DocumentType @default(RESUME)
+  filename   String
+  mimeType   String
+  storageKey String
+  size       Int
+  tags       String[]     @default([])
+  createdAt  DateTime     @default(now())
+}
+
+enum ApplicationStatus {
+  IN_PROGRESS
+  APPLIED
+  INTERVIEWING
+  OFFER
+  REJECTED
+  ARCHIVED
+}
+
+model Application {
+  id        String            @id @default(uuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url       String
+  domain    String
+  jobTitle  String?
+  status    ApplicationStatus @default(IN_PROGRESS)
+  sessionId String            @unique
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  fields         ApplicationField[]
+  aiInteractions AIInteraction[]
+}
+
+enum MappingAction {
+  FILL
+  REVIEW
+  SKIP
+}
+
+enum MappingSource {
+  RULE
+  AI_FAST
+  AI_STRONG
+  AI_REASONING
+  RULE_FALLBACK
+  USER_OVERRIDE
+  ADAPTER
+}
+
+model ApplicationField {
+  id              String        @id @default(uuid())
+  applicationId   String
+  application     Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  rawLabel        String
+  normalizedLabel String
+  domSelectorHash String
+  profilePath     String?
+  confidence      Float
+  action          MappingAction
+  source          MappingSource
+  finalValue      String?       @db.Text
+  createdAt       DateTime      @default(now())
+}
+
+model FieldMapping {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  normalizedLabel String
+  domainScope     String?  // nullable — global vs per-domain
+  profilePath     String
+  confidence      Float
+  createdAt       DateTime @default(now())
+}
+
+enum AIOperation {
+  CLASSIFY
+  JOB_ANALYSIS
+  ANSWER_GEN
+  RESUME_MATCH
+}
+
+model AIInteraction {
+  id            String       @id @default(uuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  operation     AIOperation
+  inputTokens   Int
+  outputTokens  Int
+  model         String
+  latencyMs     Int
+  success       Boolean
+  errorCode     String?
+  createdAt     DateTime     @default(now())
+}
+
+model UserPreference {
+  id                          String   @id @default(uuid())
+  userId                      String   @unique
+  user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  autofillConfidenceThreshold Float    @default(0.95)
+  preferredResumeId           String?
+  notificationSettings        Json?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}
+
+enum ActorType {
+  USER
+  SYSTEM
+  AI
+}
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actorType  ActorType
+  action     String
+  targetType String
+  targetId   String?
+  createdAt  DateTime  @default(now())
+}

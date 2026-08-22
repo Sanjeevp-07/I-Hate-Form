@@ -1,0 +1,19 @@
+{
+  "name": "@internship-copilot/ai",
+  "version": "0.1.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@internship-copilot/config": "workspace:*",
+    "@internship-copilot/types": "workspace:*",
+    "@internship-copilot/validation": "workspace:*",
+    "openai": "^4.86.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}

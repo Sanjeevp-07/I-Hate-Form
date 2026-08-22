@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Closed Shadow DOM Fixture</title>
+</head>
+<body>
+  <h1>Closed Shadow Root (Hard Limitation Simulation)</h1>
+  <div id="closed-host"></div>
+
+  <script>
+    const host = document.getElementById("closed-host");
+    // Closed roots cannot be pierced via element.shadowRoot
+    const shadow = host.attachShadow({ mode: "closed" });
+    shadow.innerHTML = `
+      <form>
+        <label for="closed-input">Confidential Field</label>
+        <input type="text" id="closed-input" />
+      </form>
+    `;
+  </script>
+</body>
+</html>
