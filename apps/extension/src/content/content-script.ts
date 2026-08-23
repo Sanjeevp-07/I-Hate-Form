@@ -4,53 +4,75 @@ import { FrameRegistry } from "./frame-registry";
 import { FormMutationWatcher } from "./mutation-observer";
 import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPayload } from "../types";
 
-// Initialize frame registry for this context
-const frameMeta = FrameRegistry.initialize();
-const currentFrameId = frameMeta.frameId;
-
-// Listen for messages from background worker / sidepanel
-chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
-  if (message.type === "SCAN_FORM") {
-    const scanStats = scanFormFieldsWithStats();
-    const payload: ScanResultPayload & { closedShadowRootsDetected?: number } = {
-      frameId: currentFrameId,
-      fields: scanStats.fields,
-      closedShadowRootsDetected: scanStats.closedShadowRootsDetected,
-    };
-    sendResponse(payload);
-    return true;
+// Wrap in self-invoking function and guard against duplicate injection
+(() => {
+  if ((window as any).__IHATEFORM_CONTENT_SCRIPT_INITIALIZED__) {
+    return;
   }
+  (window as any).__IHATEFORM_CONTENT_SCRIPT_INITIALIZED__ = true;
 
-  if (message.type === "FILL_FIELDS") {
-    const payload = message.payload as FillFieldsPayload;
-    const scanStats = scanFormFieldsWithStats();
-    const autofillResult = executeAutofill(scanStats.fields, payload.mappings);
+  // Initialize frame registry for this context
+  const frameMeta = FrameRegistry.initialize();
+  const currentFrameId = frameMeta.frameId;
 
-    const resultPayload: FillResultPayload = {
-      filledFieldIds: autofillResult.filledFieldIds,
-      skippedFieldIds: autofillResult.skippedFieldIds,
-      errors: autofillResult.errors,
-    };
-    sendResponse(resultPayload);
-    return true;
-  }
-});
+  // Listen for messages from background worker / sidepanel
+  chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
+    if (message.type === "SCAN_FORM") {
+      try {
+        const scanStats = scanFormFieldsWithStats();
+        const payload: ScanResultPayload & { closedShadowRootsDetected?: number } = {
+          frameId: currentFrameId,
+          fields: scanStats.fields,
+          closedShadowRootsDetected: scanStats.closedShadowRootsDetected,
+        };
+        sendResponse(payload);
+      } catch (err) {
+        sendResponse({ frameId: currentFrameId, fields: [], error: String(err) });
+      }
+      return true;
+    }
 
-// Setup dynamic form watcher
-const mutationWatcher = new FormMutationWatcher(() => {
+    if (message.type === "FILL_FIELDS") {
+      try {
+        const payload = message.payload as FillFieldsPayload;
+        const scanStats = scanFormFieldsWithStats();
+        const autofillResult = executeAutofill(scanStats.fields, payload.mappings);
+
+        const resultPayload: FillResultPayload = {
+          filledFieldIds: autofillResult.filledFieldIds,
+          skippedFieldIds: autofillResult.skippedFieldIds,
+          errors: autofillResult.errors,
+        };
+        sendResponse(resultPayload);
+      } catch (err) {
+        sendResponse({ filledFieldIds: [], skippedFieldIds: [], errors: [{ fieldId: "global", errorCode: "FRAMEWORK_BLOCKED", message: String(err) }] });
+      }
+      return true;
+    }
+  });
+
+  // Setup dynamic form watcher
   try {
-    const scanStats = scanFormFieldsWithStats();
-    chrome.runtime.sendMessage({
-      type: "SCAN_RESULT",
-      payload: {
-        frameId: currentFrameId,
-        fields: scanStats.fields,
-        closedShadowRootsDetected: scanStats.closedShadowRootsDetected,
-      },
+    const mutationWatcher = new FormMutationWatcher(() => {
+      try {
+        const scanStats = scanFormFieldsWithStats();
+        chrome.runtime.sendMessage({
+          type: "SCAN_RESULT",
+          payload: {
+            frameId: currentFrameId,
+            fields: scanStats.fields,
+            closedShadowRootsDetected: scanStats.closedShadowRootsDetected,
+          },
+        }).catch(() => {
+          // Ignore disconnected port errors
+        });
+      } catch {
+        // Ignore context invalidation on reload
+      }
     });
-  } catch {
-    // Ignore context invalidation on reload
-  }
-});
 
-mutationWatcher.start();
+    mutationWatcher.start();
+  } catch {
+    // Ignore mutation observer errors
+  }
+})();

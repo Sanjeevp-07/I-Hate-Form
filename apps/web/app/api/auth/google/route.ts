@@ -1,64 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@internship-copilot/database";
-import { createSessionToken, AUTH_COOKIE_NAME } from "@/lib/auth";
+import { getOrCreateUser } from "@internship-copilot/database";
+import { createSessionToken, AUTH_COOKIE_NAME, isAdminUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
-    const email = url.searchParams.get("email") || "sanjeev@example.com";
-    const name = url.searchParams.get("name") || "Sanjeev Kumar";
+    const email = url.searchParams.get("email") || "sanjeev1803t@gmail.com";
+    const name = url.searchParams.get("name") || (isAdminUser(email) ? "Sanjeev (Admin)" : email.split("@")[0]);
     const normalizedEmail = email.toLowerCase().trim();
 
-    let userId = "user_google_" + Buffer.from(normalizedEmail).toString("hex").substring(0, 12);
-
-    try {
-      let user = await prisma.user.findUnique({
-        where: { email: normalizedEmail },
-      });
-
-      if (!user) {
-        user = await prisma.user.create({
-          data: {
-            id: userId,
-            email: normalizedEmail,
-            name,
-            authProvider: "google",
-            profile: {
-              create: {
-                personal: {
-                  firstName: name.split(" ")[0] || "Sanjeev",
-                  lastName: name.split(" ").slice(1).join(" ") || "Kumar",
-                  email: normalizedEmail,
-                  phone: "+91 9876543210",
-                  countryCode: "+91",
-                  city: "New Delhi",
-                  state: "Delhi",
-                  country: "India",
-                  postalCode: "110001",
-                  address: "",
-                  authorizedInCountry: true,
-                  requiresSponsorship: false,
-                },
-                links: {
-                  linkedin: "https://linkedin.com/in/sanjeev-dev",
-                  github: "https://github.com/sanjeev-dev",
-                  portfolio: "",
-                },
-              },
-            },
-          },
-          select: { id: true, email: true, name: true },
-        });
-      }
-      userId = user.id;
-    } catch {
-      // Database offline fallback: continue with session creation
-    }
+    const user = getOrCreateUser(normalizedEmail, name, "google");
 
     const sessionUser = {
-      id: userId,
+      id: user.id,
       email: normalizedEmail,
-      name,
+      name: user.name,
+      isAdmin: isAdminUser(normalizedEmail),
     };
 
     const token = createSessionToken(sessionUser);

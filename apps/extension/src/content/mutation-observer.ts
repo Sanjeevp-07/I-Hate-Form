@@ -1,8 +1,15 @@
 export class FormMutationWatcher {
-  private observer: MutationObserver | null = null;
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private observer: MutationObserver | null;
+  private debounceTimer: any;
+  private onFormMutated: () => void;
+  private debounceMs: number;
 
-  constructor(private onFormMutated: () => void, private debounceMs = 500) {}
+  constructor(onFormMutated: () => void, debounceMs = 500) {
+    this.observer = null;
+    this.debounceTimer = null;
+    this.onFormMutated = onFormMutated;
+    this.debounceMs = debounceMs;
+  }
 
   public start(): void {
     if (this.observer) return;
@@ -37,10 +44,12 @@ export class FormMutationWatcher {
       }
     });
 
-    this.observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    if (document.body) {
+      this.observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    }
   }
 
   public stop(): void {

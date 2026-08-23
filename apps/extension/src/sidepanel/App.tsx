@@ -106,6 +106,8 @@ export const App: React.FC = () => {
     const links = userProfile.links || {};
 
     switch (path) {
+      case "personal.title":
+        return personal.gender?.toLowerCase() === "female" ? "Ms." : "Mr.";
       case "personal.firstName":
         return personal.firstName || null;
       case "personal.middleName":
@@ -121,13 +123,13 @@ export const App: React.FC = () => {
       case "personal.countryCode":
         return personal.countryCode || "+91";
       case "personal.gender":
-        return personal.gender || null;
+        return personal.gender || "Male";
       case "personal.nationality":
-        return personal.nationality || null;
+        return personal.nationality || "Indian";
       case "personal.dob":
         return personal.dob || null;
       case "personal.country":
-        return personal.country || null;
+        return personal.country || "India";
       case "personal.state":
         return personal.state || null;
       case "personal.city":

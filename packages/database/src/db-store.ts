@@ -88,78 +88,45 @@ export function readDatabase(): DatabaseData {
       return JSON.parse(content);
     }
   } catch (err) {
-    console.warn("Error reading database file, initializing empty:", err);
+    console.warn("Error reading database file, initializing default:", err);
   }
 
   const initialData: DatabaseData = {
     users: {
-      user_admin: {
-        id: "user_admin",
+      usr_jch177u: {
+        id: "usr_jch177u",
         email: "sanjeev1803t@gmail.com",
-        name: "Sanjeev Kumar (Admin)",
+        name: "Sanjeev Kumar",
         authProvider: "google",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: "2026-08-23T07:39:20.815Z",
+        updatedAt: "2026-08-23T07:39:20.817Z",
         profile: {
           personal: {
             firstName: "Sanjeev",
             middleName: "",
             lastName: "Kumar",
             email: "sanjeev1803t@gmail.com",
-            phone: "+91 9876543210",
+            phone: "8825171882",
             countryCode: "+91",
             gender: "Male",
             nationality: "Indian",
-            dob: "2002-05-15",
+            dob: "06/07/2005",
             country: "India",
-            state: "Delhi",
-            city: "New Delhi",
-            postalCode: "110001",
-            address: "Connaught Place, Central Delhi",
+            state: "Uttar Pradesh",
+            city: "Greater Noida",
+            postalCode: "201306",
+            address: "Lakhnawali, back of RCS School",
             requiresSponsorship: false,
             authorizedInCountry: true,
           },
           links: {
-            linkedin: "https://linkedin.com/in/sanjeev-dev",
-            github: "https://github.com/sanjeev-dev",
-            portfolio: "https://sanjeev.dev",
+            linkedin: "https://www.linkedin.com/in/sanjeev-kumar-1803t/",
+            github: "https://github.com/Sanjeevp-07",
+            portfolio: "https://port-folio-three-olive.vercel.app/",
           },
         },
-        documents: [
-          {
-            id: "doc_1",
-            userId: "user_admin",
-            title: "Fullstack_SWE_Resume_2026.pdf",
-            filename: "Fullstack_SWE_Resume_2026.pdf",
-            sizeBytes: 245000,
-            mimeType: "application/pdf",
-            tags: ["Fullstack", "TypeScript", "React", "Node.js", "Next.js"],
-            isPreferred: true,
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: "doc_2",
-            userId: "user_admin",
-            title: "AI_ML_Intern_Resume_2026.pdf",
-            filename: "AI_ML_Intern_Resume_2026.pdf",
-            sizeBytes: 310000,
-            mimeType: "application/pdf",
-            tags: ["Machine Learning", "Python", "PyTorch", "LLMs"],
-            isPreferred: false,
-            createdAt: new Date().toISOString(),
-          },
-        ],
-        applications: [
-          {
-            id: "app_1",
-            company: "Stripe",
-            jobTitle: "Software Engineering Intern",
-            url: "https://boards.greenhouse.io/stripe/jobs/123",
-            status: "Applied",
-            fieldsFilled: 18,
-            createdAt: new Date().toISOString(),
-          },
-        ],
+        documents: [],
+        applications: [],
       },
     },
     version: "2.0.0",
@@ -195,8 +162,8 @@ export function getOrCreateUser(email: string, name?: string, authProvider: "goo
       updatedAt: new Date().toISOString(),
       profile: {
         personal: {
-          firstName: name?.split(" ")[0] || "",
-          lastName: name?.split(" ").slice(1).join(" ") || "",
+          firstName: "",
+          lastName: "",
           email: normalizedEmail,
           phone: "",
           countryCode: "+91",
@@ -239,7 +206,7 @@ export function updateUserProfile(userIdOrEmail: string, profile: StoredProfile)
   user.profile = profile;
   user.updatedAt = new Date().toISOString();
   if (profile.personal?.firstName || profile.personal?.lastName) {
-    user.name = `${profile.personal.firstName || ""} ${profile.personal.lastName || ""}`.trim();
+    user.name = `${profile.personal.firstName || ""} ${profile.personal.lastName || ""}`.trim() || user.name;
   }
 
   db.users[user.id] = user;
@@ -271,7 +238,7 @@ export function addDocumentToUser(
     sizeBytes: doc.sizeBytes,
     mimeType: doc.mimeType,
     tags: doc.tags.length > 0 ? doc.tags : ["Resume", "Software Engineering"],
-    isPreferred: user.documents.length === 0, // First document is preferred by default
+    isPreferred: user.documents.length === 0,
     createdAt: new Date().toISOString(),
   };
 
@@ -289,7 +256,6 @@ export function deleteUserDocument(userIdOrEmail: string, docId: string): boolea
   user.documents = user.documents.filter((d) => d.id !== docId);
 
   if (user.documents.length < initialLen) {
-    // If deleted was preferred, set new preferred
     if (user.documents.length > 0 && !user.documents.some((d) => d.isPreferred)) {
       user.documents[0].isPreferred = true;
     }

@@ -5,59 +5,57 @@ export interface FrameMetadata {
   isCrossOrigin: boolean;
 }
 
-export class FrameRegistry {
-  private static frameId: number = 0;
-  private static isInitialized: boolean = false;
-  private static isCrossOrigin: boolean = false;
+let frameId = 0;
+let isInitialized = false;
+let isCrossOrigin = false;
 
-  public static initialize(): FrameMetadata {
-    if (this.isInitialized) {
-      return this.getMetadata();
+export const FrameRegistry = {
+  initialize(): FrameMetadata {
+    if (isInitialized) {
+      return FrameRegistry.getMetadata();
     }
 
-    const isTop = window === window.top;
+    const isTop = typeof window !== "undefined" && window === window.top;
 
     if (isTop) {
-      this.frameId = 0;
-      this.isCrossOrigin = false;
-    } else {
-      // Determine if parent is accessible (same-origin vs cross-origin)
+      frameId = 0;
+      isCrossOrigin = false;
+    } else if (typeof window !== "undefined") {
       try {
         if (window.parent && window.parent.location.href) {
-          this.isCrossOrigin = false;
+          isCrossOrigin = false;
         }
       } catch {
-        this.isCrossOrigin = true;
+        isCrossOrigin = true;
       }
 
-      // Generate a stable frame ID for this frame context
       const originSeed = window.location.origin || "frame";
       let hash = 0;
       for (let i = 0; i < originSeed.length; i++) {
         hash = (hash << 5) - hash + originSeed.charCodeAt(i);
         hash |= 0;
       }
-      this.frameId = Math.abs(hash) % 900000 + 100000;
+      frameId = Math.abs(hash) % 900000 + 100000;
     }
 
-    this.isInitialized = true;
-    return this.getMetadata();
-  }
+    isInitialized = true;
+    return FrameRegistry.getMetadata();
+  },
 
-  public static getFrameId(): number {
-    return this.frameId;
-  }
+  getFrameId(): number {
+    return frameId;
+  },
 
-  public static isTopFrame(): boolean {
-    return window === window.top;
-  }
+  isTopFrame(): boolean {
+    return typeof window !== "undefined" && window === window.top;
+  },
 
-  public static getMetadata(): FrameMetadata {
+  getMetadata(): FrameMetadata {
     return {
-      frameId: this.frameId,
-      isTop: window === window.top,
-      origin: window.location.origin,
-      isCrossOrigin: this.isCrossOrigin,
+      frameId,
+      isTop: typeof window !== "undefined" && window === window.top,
+      origin: typeof window !== "undefined" ? window.location.origin : "",
+      isCrossOrigin,
     };
-  }
-}
+  },
+};

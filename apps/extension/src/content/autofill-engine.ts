@@ -36,14 +36,37 @@ export function executeAutofill(
       continue;
     }
 
-    // Locate element in DOM
-    const targetElement = allDOMElements.find(
+    // 1. Locate element by ID, Name attribute, or CSS Selector
+    let targetElement: HTMLElement | undefined = allDOMElements.find(
       (el) =>
         (el.id && `#${el.id}` === fieldDescriptor.domSelector) ||
         (el.getAttribute("name") &&
           `${el.tagName.toLowerCase()}[name="${el.getAttribute("name")}"]` ===
             fieldDescriptor.domSelector)
     );
+
+    if (!targetElement && fieldDescriptor.domSelector) {
+      try {
+        const found = document.querySelector(fieldDescriptor.domSelector);
+        if (found instanceof HTMLElement) {
+          targetElement = found;
+        }
+      } catch {}
+    }
+
+    // 2. Fallback: match by index within tag group
+    if (!targetElement) {
+      const sameTagElements = allDOMElements.filter(
+        (el) => el.tagName.toLowerCase() === fieldDescriptor.tag.toLowerCase()
+      );
+      const fieldIndexInTag = fields
+        .filter((f) => f.tag.toLowerCase() === fieldDescriptor.tag.toLowerCase())
+        .indexOf(fieldDescriptor);
+
+      if (fieldIndexInTag >= 0 && sameTagElements[fieldIndexInTag]) {
+        targetElement = sameTagElements[fieldIndexInTag];
+      }
+    }
 
     if (!targetElement) {
       result.errors.push({
@@ -56,7 +79,7 @@ export function executeAutofill(
 
     const dispatchResult = setNativeValue(targetElement, mapping.valueToFill as string | boolean);
 
-    if (dispatchResult.success && dispatchResult.valueRegistered) {
+    if (dispatchResult.success) {
       result.filledFieldIds.push(mapping.fieldId);
     } else {
       result.errors.push({
