@@ -11,7 +11,15 @@ export const AUTH_CONFIG = {
 } as const;
 
 export const AI_CONFIG = {
-  DEFAULT_FAST_MODEL: "gpt-4o-mini",
-  DEFAULT_WORKHORSE_MODEL: "gpt-4o",
-  DEFAULT_REASONING_MODEL: "o3-mini",
+  // NVIDIA NIM OpenAI-compatible endpoint (free tier available at build.nvidia.com)
+  DEFAULT_BASE_URL: "https://integrate.api.nvidia.com/v1",
+
+  // Tier 1: Fast/cheap model tier (simple field classification, normalization)
+  DEFAULT_FAST_MODEL: "meta/llama-3.1-8b-instruct",
+
+  // Tier 2: Workhorse model tier (job parsing, subjective answers, resume matching)
+  DEFAULT_WORKHORSE_MODEL: "meta/llama-3.1-70b-instruct",
+
+  // Tier 3: Top reasoning tier (opt-in escalation for hard ambiguous cases)
+  DEFAULT_REASONING_MODEL: "deepseek-ai/deepseek-r1",
 } as const;

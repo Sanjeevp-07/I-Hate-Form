@@ -12,10 +12,11 @@ function computeHash(str: string): string {
 }
 
 function findLabelForElement(element: HTMLElement): string {
-  // 1. Associated label via htmlFor
+  // 1. Associated label via htmlFor within the same root node (document or ShadowRoot)
   const id = element.getAttribute("id");
-  if (id) {
-    const labelEl = document.querySelector(`label[for="${id}"]`);
+  const rootNode = element.getRootNode() as Document | ShadowRoot;
+  if (id && rootNode && typeof rootNode.querySelector === "function") {
+    const labelEl = rootNode.querySelector(`label[for="${id}"]`);
     if (labelEl && labelEl.textContent) {
       return labelEl.textContent.trim();
     }

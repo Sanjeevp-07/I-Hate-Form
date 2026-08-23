@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Internship Application Copilot",
-  description: "Autonomous, privacy-first internship application copilot and autofill assistant.",
+  title: "I Hate Form — Modern Form Automation Platform",
+  description: "Autonomous, privacy-first job application autofill and profile sync assistant.",
 };
 
 export default function RootLayout({

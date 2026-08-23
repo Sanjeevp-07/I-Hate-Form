@@ -1,0 +1,99 @@
+{
+  "users": {
+    "user_sanjeev": {
+      "id": "user_sanjeev",
+      "email": "sanjeev@example.com",
+      "name": "Sanjeev Kumar",
+      "authProvider": "google",
+      "createdAt": "2026-08-23T06:14:09.905Z",
+      "updatedAt": "2026-08-23T06:14:09.905Z",
+      "profile": {
+        "personal": {
+          "firstName": "Sanjeev",
+          "middleName": "",
+          "lastName": "Kumar",
+          "email": "sanjeev@example.com",
+          "phone": "9876543210",
+          "countryCode": "+91",
+          "gender": "Male",
+          "nationality": "Indian",
+          "dob": "2002-05-15",
+          "country": "India",
+          "state": "Delhi",
+          "city": "New Delhi",
+          "postalCode": "110001",
+          "address": "Connaught Place",
+          "requiresSponsorship": false,
+          "authorizedInCountry": true
+        },
+        "links": {
+          "linkedin": "https://linkedin.com/in/sanjeev-dev",
+          "github": "https://github.com/sanjeev-dev",
+          "portfolio": "https://sanjeev.dev"
+        }
+      },
+      "applications": [
+        {
+          "id": "app_1",
+          "company": "Stripe",
+          "jobTitle": "Software Engineering Intern",
+          "url": "https://boards.greenhouse.io/stripe/jobs/123",
+          "status": "Applied",
+          "fieldsFilled": 18,
+          "createdAt": "2026-08-23T06:14:09.905Z"
+        }
+      ]
+    },
+    "usr_on7yrna": {
+      "id": "usr_on7yrna",
+      "email": "user_73616e6a6565",
+      "name": "Sanjeev Kumar",
+      "authProvider": "google",
+      "createdAt": "2026-08-23T06:15:01.468Z",
+      "updatedAt": "2026-08-23T06:19:49.839Z",
+      "profile": {
+        "personal": {
+          "firstName": "Sanjeev",
+          "middleName": "",
+          "lastName": "Kumar",
+          "email": "sanjeev.kumar.cs27@iilm.edu",
+          "phone": "8825171882",
+          "countryCode": "+91",
+          "gender": "Male",
+          "nationality": "Indian",
+          "dob": "06/07/2005",
+          "country": "India",
+          "state": "Uttar Pradesh",
+          "city": "Greater Noida ",
+          "postalCode": "201306",
+          "address": "Bacck of RCS School",
+          "requiresSponsorship": false,
+          "authorizedInCountry": true
+        },
+        "links": {
+          "linkedin": "https://www.linkedin.com/in/sanjeev-kumar-1803t/",
+          "github": "https://github.com/sanjeev-devhttps://github.com/Sanjeevp-07/",
+          "portfolio": "https://port-folio-three-olive.vercel.app/"
+        }
+      },
+      "applications": [],
+      "documents": [
+        {
+          "id": "doc_ajaoc8z",
+          "userId": "usr_on7yrna",
+          "title": "Sanjeev-Resume.pdf",
+          "filename": "Sanjeev-Resume.pdf",
+          "sizeBytes": 100401,
+          "mimeType": "application/pdf",
+          "tags": [
+            "Resume",
+            "General"
+          ],
+          "isPreferred": true,
+          "createdAt": "2026-08-23T06:51:33.599Z"
+        }
+      ]
+    }
+  },
+  "version": "2.0.0"
+}

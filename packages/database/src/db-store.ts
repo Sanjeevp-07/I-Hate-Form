@@ -1,0 +1,313 @@
+import fs from "fs";
+import path from "path";
+
+const DATA_DIR = path.resolve(process.cwd(), "..", "..", "data");
+const DB_FILE = path.join(DATA_DIR, "ihateform-database.json");
+const DOCS_DIR = path.join(DATA_DIR, "documents");
+
+export interface StoredProfile {
+  personal: {
+    firstName?: string;
+    middleName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    countryCode?: string;
+    gender?: string;
+    dob?: string;
+    nationality?: string;
+    country?: string;
+    state?: string;
+    city?: string;
+    postalCode?: string;
+    address?: string;
+    requiresSponsorship?: boolean;
+    authorizedInCountry?: boolean;
+  };
+  links: {
+    linkedin?: string;
+    github?: string;
+    portfolio?: string;
+  };
+}
+
+export interface StoredDocument {
+  id: string;
+  userId: string;
+  title: string;
+  filename: string;
+  sizeBytes: number;
+  mimeType: string;
+  tags: string[];
+  isPreferred: boolean;
+  createdAt: string;
+}
+
+export interface StoredUser {
+  id: string;
+  email: string;
+  name: string;
+  passwordHash?: string;
+  authProvider: "google" | "email";
+  createdAt: string;
+  updatedAt: string;
+  profile: StoredProfile;
+  documents: StoredDocument[];
+  applications: Array<{
+    id: string;
+    company: string;
+    jobTitle: string;
+    url: string;
+    status: string;
+    fieldsFilled: number;
+    createdAt: string;
+  }>;
+}
+
+export interface DatabaseData {
+  users: Record<string, StoredUser>;
+  version: string;
+}
+
+function ensureDataDirs(): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    if (!fs.existsSync(DOCS_DIR)) {
+      fs.mkdirSync(DOCS_DIR, { recursive: true });
+    }
+  } catch {}
+}
+
+export function readDatabase(): DatabaseData {
+  ensureDataDirs();
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const content = fs.readFileSync(DB_FILE, "utf-8");
+      return JSON.parse(content);
+    }
+  } catch (err) {
+    console.warn("Error reading database file, initializing empty:", err);
+  }
+
+  const initialData: DatabaseData = {
+    users: {
+      user_admin: {
+        id: "user_admin",
+        email: "sanjeev1803t@gmail.com",
+        name: "Sanjeev Kumar (Admin)",
+        authProvider: "google",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        profile: {
+          personal: {
+            firstName: "Sanjeev",
+            middleName: "",
+            lastName: "Kumar",
+            email: "sanjeev1803t@gmail.com",
+            phone: "+91 9876543210",
+            countryCode: "+91",
+            gender: "Male",
+            nationality: "Indian",
+            dob: "2002-05-15",
+            country: "India",
+            state: "Delhi",
+            city: "New Delhi",
+            postalCode: "110001",
+            address: "Connaught Place, Central Delhi",
+            requiresSponsorship: false,
+            authorizedInCountry: true,
+          },
+          links: {
+            linkedin: "https://linkedin.com/in/sanjeev-dev",
+            github: "https://github.com/sanjeev-dev",
+            portfolio: "https://sanjeev.dev",
+          },
+        },
+        documents: [
+          {
+            id: "doc_1",
+            userId: "user_admin",
+            title: "Fullstack_SWE_Resume_2026.pdf",
+            filename: "Fullstack_SWE_Resume_2026.pdf",
+            sizeBytes: 245000,
+            mimeType: "application/pdf",
+            tags: ["Fullstack", "TypeScript", "React", "Node.js", "Next.js"],
+            isPreferred: true,
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: "doc_2",
+            userId: "user_admin",
+            title: "AI_ML_Intern_Resume_2026.pdf",
+            filename: "AI_ML_Intern_Resume_2026.pdf",
+            sizeBytes: 310000,
+            mimeType: "application/pdf",
+            tags: ["Machine Learning", "Python", "PyTorch", "LLMs"],
+            isPreferred: false,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+        applications: [
+          {
+            id: "app_1",
+            company: "Stripe",
+            jobTitle: "Software Engineering Intern",
+            url: "https://boards.greenhouse.io/stripe/jobs/123",
+            status: "Applied",
+            fieldsFilled: 18,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      },
+    },
+    version: "2.0.0",
+  };
+
+  writeDatabase(initialData);
+  return initialData;
+}
+
+export function writeDatabase(data: DatabaseData): void {
+  ensureDataDirs();
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Error writing to database file:", err);
+  }
+}
+
+export function getOrCreateUser(email: string, name?: string, authProvider: "google" | "email" = "google"): StoredUser {
+  const db = readDatabase();
+  const normalizedEmail = email.toLowerCase().trim();
+
+  let user = Object.values(db.users).find((u) => u.email.toLowerCase() === normalizedEmail);
+
+  if (!user) {
+    const id = "usr_" + Math.random().toString(36).substring(2, 9);
+    user = {
+      id,
+      email: normalizedEmail,
+      name: name || normalizedEmail.split("@")[0],
+      authProvider,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      profile: {
+        personal: {
+          firstName: name?.split(" ")[0] || "",
+          lastName: name?.split(" ").slice(1).join(" ") || "",
+          email: normalizedEmail,
+          phone: "",
+          countryCode: "+91",
+          city: "",
+          state: "",
+          country: "",
+          postalCode: "",
+          address: "",
+          requiresSponsorship: false,
+          authorizedInCountry: true,
+        },
+        links: {
+          linkedin: "",
+          github: "",
+          portfolio: "",
+        },
+      },
+      documents: [],
+      applications: [],
+    };
+    db.users[id] = user;
+    writeDatabase(db);
+  }
+
+  return user;
+}
+
+export function updateUserProfile(userIdOrEmail: string, profile: StoredProfile): StoredUser {
+  const db = readDatabase();
+  let user = db.users[userIdOrEmail];
+
+  if (!user) {
+    user = Object.values(db.users).find((u) => u.email.toLowerCase() === userIdOrEmail.toLowerCase());
+  }
+
+  if (!user) {
+    user = getOrCreateUser(userIdOrEmail);
+  }
+
+  user.profile = profile;
+  user.updatedAt = new Date().toISOString();
+  if (profile.personal?.firstName || profile.personal?.lastName) {
+    user.name = `${profile.personal.firstName || ""} ${profile.personal.lastName || ""}`.trim();
+  }
+
+  db.users[user.id] = user;
+  writeDatabase(db);
+  return user;
+}
+
+export function getUserDocuments(userIdOrEmail: string): StoredDocument[] {
+  const db = readDatabase();
+  const user = db.users[userIdOrEmail] || Object.values(db.users).find((u) => u.email.toLowerCase() === userIdOrEmail.toLowerCase());
+  return user?.documents || [];
+}
+
+export function addDocumentToUser(
+  userIdOrEmail: string,
+  doc: { title: string; filename: string; sizeBytes: number; mimeType: string; tags: string[]; fileBufferBase64?: string }
+): StoredDocument {
+  const db = readDatabase();
+  let user = db.users[userIdOrEmail] || Object.values(db.users).find((u) => u.email.toLowerCase() === userIdOrEmail.toLowerCase());
+  if (!user) user = getOrCreateUser(userIdOrEmail);
+
+  if (!user.documents) user.documents = [];
+
+  const newDoc: StoredDocument = {
+    id: "doc_" + Math.random().toString(36).substring(2, 9),
+    userId: user.id,
+    title: doc.title,
+    filename: doc.filename,
+    sizeBytes: doc.sizeBytes,
+    mimeType: doc.mimeType,
+    tags: doc.tags.length > 0 ? doc.tags : ["Resume", "Software Engineering"],
+    isPreferred: user.documents.length === 0, // First document is preferred by default
+    createdAt: new Date().toISOString(),
+  };
+
+  user.documents.push(newDoc);
+  writeDatabase(db);
+  return newDoc;
+}
+
+export function deleteUserDocument(userIdOrEmail: string, docId: string): boolean {
+  const db = readDatabase();
+  const user = db.users[userIdOrEmail] || Object.values(db.users).find((u) => u.email.toLowerCase() === userIdOrEmail.toLowerCase());
+  if (!user || !user.documents) return false;
+
+  const initialLen = user.documents.length;
+  user.documents = user.documents.filter((d) => d.id !== docId);
+
+  if (user.documents.length < initialLen) {
+    // If deleted was preferred, set new preferred
+    if (user.documents.length > 0 && !user.documents.some((d) => d.isPreferred)) {
+      user.documents[0].isPreferred = true;
+    }
+    writeDatabase(db);
+    return true;
+  }
+  return false;
+}
+
+export function setPreferredDocument(userIdOrEmail: string, docId: string): boolean {
+  const db = readDatabase();
+  const user = db.users[userIdOrEmail] || Object.values(db.users).find((u) => u.email.toLowerCase() === userIdOrEmail.toLowerCase());
+  if (!user || !user.documents) return false;
+
+  for (const doc of user.documents) {
+    doc.isPreferred = doc.id === docId;
+  }
+
+  writeDatabase(db);
+  return true;
+}
