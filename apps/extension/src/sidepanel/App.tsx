@@ -3,7 +3,7 @@ import { FieldDescriptor, FieldError, FieldMapping } from "@internship-copilot/t
 import { CONFIDENCE_THRESHOLDS } from "@internship-copilot/config";
 import { mapFieldDeterministically } from "../content/field-mapper";
 import { getSessionState, setSessionState } from "../storage/chrome-storage";
-import { Shield, Play, RefreshCw, Sparkles, Lock, Layers, AlertCircle, CheckCircle2, LogIn } from "lucide-react";
+import { Shield, Play, RefreshCw, Sparkles, Lock, Layers, AlertCircle, CheckCircle2, LogIn, ChevronDown, FileText } from "lucide-react";
 
 const BACKEND_BASE_URL = "http://localhost:3000";
 
@@ -25,7 +25,7 @@ export const App: React.FC = () => {
   const [isFilling, setIsFilling] = useState<boolean>(false);
   const [closedRootsCount, setClosedRootsCount] = useState<number>(0);
   const [errors, setErrors] = useState<FieldError[]>([]);
-  const [fillSummary, setFillSummary] = useState<{ filled: number; skipped: number } | null>(null);
+  const [fillSummary, setFillSummary] = useState<{ filled: number; skipped: number; resumeUploaded?: boolean; resumeName?: string } | null>(null);
 
   // Check authentication status and fetch user profile
   const checkAuthAndFetchProfile = async () => {
@@ -151,7 +151,7 @@ export const App: React.FC = () => {
 
   const ensureContentScriptInjected = async (tabId: number): Promise<boolean> => {
     try {
-      if (typeof chrome === "undefined" || !chrome.scripting) return true;
+      if (typeof chrome !== "undefined" && chrome.scripting) return true;
       await chrome.scripting.executeScript({
         target: { tabId, allFrames: true },
         files: ["content.js"],
@@ -160,6 +160,20 @@ export const App: React.FC = () => {
     } catch {
       return false;
     }
+  };
+
+  const handleOptionOverride = (fieldIndex: number, newValue: string) => {
+    setMappings((prev) => {
+      const updated = [...prev];
+      if (updated[fieldIndex]) {
+        updated[fieldIndex] = {
+          ...updated[fieldIndex],
+          valueToFill: newValue,
+          action: "fill",
+        };
+      }
+      return updated;
+    });
   };
 
   const handleScanForm = async () => {
@@ -223,10 +237,15 @@ export const App: React.FC = () => {
     setErrors([]);
 
     // Update mappings with latest profile values before autofilling
-    const enrichedMappings = mappings.map((m) => ({
-      ...m,
-      valueToFill: resolveProfileValue(m.profilePath) || m.valueToFill,
-    }));
+    const enrichedMappings = mappings.map((m) => {
+      const profileVal = resolveProfileValue(m.profilePath);
+      const targetVal = m.valueToFill !== undefined && m.valueToFill !== null ? m.valueToFill : profileVal;
+
+      return {
+        ...m,
+        valueToFill: targetVal,
+      };
+    });
 
     try {
       if (typeof chrome !== "undefined" && chrome.tabs) {
@@ -238,7 +257,7 @@ export const App: React.FC = () => {
             tab.id,
             {
               type: "FILL_FIELDS",
-              payload: { mappings: enrichedMappings },
+              payload: { mappings: enrichedMappings, profile: userProfile },
             },
             (response) => {
               if (chrome.runtime.lastError) {
@@ -250,6 +269,8 @@ export const App: React.FC = () => {
                 setFillSummary({
                   filled: response.filledFieldIds?.length || 0,
                   skipped: response.skippedFieldIds?.length || 0,
+                  resumeUploaded: response.resumeUpload?.uploaded || false,
+                  resumeName: response.resumeUpload?.fileName || "",
                 });
                 if (response.errors) {
                   setErrors(response.errors);
@@ -439,14 +460,36 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* Resume PDF Auto-Upload Indicator */}
+      <div className="mt-2.5 p-2 bg-indigo-950/40 border border-indigo-800/40 rounded-lg text-xs flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-indigo-300 font-medium truncate">
+          <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+          <span className="truncate">
+            {userProfile?.personal
+              ? `${userProfile.personal.firstName}_${userProfile.personal.lastName}_Resume.pdf`
+              : "Sanjeev_Kumar_Resume.pdf"}
+          </span>
+        </div>
+        <span className="text-[10px] px-1.5 py-0.5 bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 rounded font-medium shrink-0">
+          Uploads 1st
+        </span>
+      </div>
+
       {/* Fill Summary Alert */}
       {fillSummary && (
-        <div className="mt-2.5 p-2.5 bg-emerald-950/50 border border-emerald-800/50 rounded-lg text-xs flex items-center justify-between text-emerald-300">
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>Filled {fillSummary.filled} fields with your saved data</span>
+        <div className="mt-2.5 p-2.5 bg-emerald-950/50 border border-emerald-800/50 rounded-lg text-xs space-y-1.5 text-emerald-300">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 font-medium">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>Autofilled {fillSummary.filled} fields</span>
+            </div>
+            <span className="text-slate-400">({fillSummary.skipped} skipped)</span>
           </div>
-          <span className="text-slate-400">({fillSummary.skipped} skipped)</span>
+          {fillSummary.resumeUploaded && (
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400/90 pl-5">
+              <span>📄 Resume PDF "{fillSummary.resumeName}" uploaded</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -511,18 +554,50 @@ export const App: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="mt-1 flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400 truncate max-w-[180px]">
+                  <div className="mt-1 flex items-center justify-between text-[11px] gap-2">
+                    <span className="text-slate-400 truncate flex-1">
                       {valueToFill ? (
-                        <span className="text-emerald-400 font-mono">"{valueToFill}"</span>
+                        <span className="text-emerald-400 font-mono font-medium">"{valueToFill}"</span>
                       ) : (
                         <span className="text-slate-600 italic">No saved value</span>
                       )}
                     </span>
-                    <span className="capitalize text-[10px] text-slate-500">
+                    <span className="capitalize text-[10px] text-slate-500 shrink-0">
                       {field.type}
                     </span>
                   </div>
+
+                  {field.type === "select" && field.options && field.options.length > 0 && (
+                    <div className="mt-2 pt-1.5 border-t border-slate-800/60">
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                        <span>Dropdown Options ({field.options.length}):</span>
+                      </div>
+                      <div className="relative">
+                        <select
+                          className="w-full bg-slate-950/80 hover:bg-slate-950 text-slate-200 border border-slate-700/80 rounded px-2 py-1 text-[11px] appearance-none cursor-pointer focus:border-indigo-500 focus:outline-none pr-6 truncate"
+                          value={
+                            field.options.find(
+                              (opt) =>
+                                opt.value.toLowerCase() === String(valueToFill).toLowerCase() ||
+                                opt.label.toLowerCase() === String(valueToFill).toLowerCase()
+                            )?.value || ""
+                          }
+                          onChange={(e) => {
+                            const selectedOpt = field.options?.find((o) => o.value === e.target.value);
+                            handleOptionOverride(idx, selectedOpt ? (selectedOpt.label || selectedOpt.value) : e.target.value);
+                          }}
+                        >
+                          <option value="" disabled>-- Select Option ({field.options.length} found) --</option>
+                          {field.options.map((opt, optIdx) => (
+                            <option key={optIdx} value={opt.value}>
+                              {opt.label || opt.value || `Option ${optIdx + 1}`}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-2 pointer-events-none" />
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

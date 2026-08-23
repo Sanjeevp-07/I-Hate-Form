@@ -10,72 +10,9 @@ interface RuleDefinition {
 
 const DETERMINISTIC_RULES: RuleDefinition[] = [
   {
-    profilePath: "personal.title",
-    patterns: [/\btitle\b/i, /salutation/i, /prefix/i],
-    getValue: (p) => {
-      const g = (p.personal as any)?.gender?.toLowerCase();
-      return g === "female" ? "Ms." : "Mr.";
-    },
-    confidence: 0.98,
-  },
-  {
-    profilePath: "personal.firstName",
-    patterns: [/first[\s_-]?name/i, /given[\s_-]?name/i, /fname/i],
-    getValue: (p) => p.personal.firstName || null,
-    confidence: 0.99,
-  },
-  {
-    profilePath: "personal.middleName",
-    patterns: [/middle[\s_-]?name/i, /mname/i],
-    getValue: (p) => (p.personal as any)?.middleName || "",
-    confidence: 0.96,
-  },
-  {
-    profilePath: "personal.lastName",
-    patterns: [/last[\s_-]?name/i, /surname/i, /family[\s_-]?name/i, /lname/i],
-    getValue: (p) => p.personal.lastName || null,
-    confidence: 0.99,
-  },
-  {
-    profilePath: "personal.fullName",
-    patterns: [/\bfull[\s_-]?name\b/i, /\bname\b/i],
-    getValue: (p) => `${p.personal.firstName || ""} ${p.personal.lastName || ""}`.trim() || null,
-    confidence: 0.95,
-  },
-  {
     profilePath: "personal.countryCode",
     patterns: [/country[\s_-]?code/i, /dial[\s_-]?code/i, /isd[\s_-]?code/i],
     getValue: (p) => (p.personal as any)?.countryCode || "+91",
-    confidence: 0.98,
-  },
-  {
-    profilePath: "personal.phone",
-    patterns: [/mobile[\s_-]?number/i, /mobile/i, /phone/i, /telephone/i, /contact[\s_-]?number/i, /cell/i],
-    getValue: (p) => p.personal.phone || null,
-    confidence: 0.98,
-  },
-  {
-    profilePath: "personal.email",
-    patterns: [/e[\s_-]?mail/i, /email[\s_-]?address/i],
-    getValue: (p) => p.personal.email || null,
-    confidence: 0.99,
-  },
-  {
-    profilePath: "personal.gender",
-    patterns: [/\bgender\b/i, /\bsex\b/i],
-    getValue: (p) => (p.personal as any)?.gender || "Male",
-    confidence: 0.98,
-  },
-  {
-    profilePath: "personal.dob",
-    patterns: [/date[\s_-]?of[\s_-]?birth/i, /\bd[\s_-]?o[\s_-]?b\b/i, /birth[\s_-]?date/i, /\bdob\b/i],
-    getValue: (p) => (p.personal as any)?.dob || "06/07/2005",
-    confidence: 0.98,
-  },
-  {
-    profilePath: "personal.nationality",
-    patterns: [/nationality/i, /citizenship/i],
-    getValue: (p) => (p.personal as any)?.nationality || "Indian",
     confidence: 0.98,
   },
   {
@@ -109,6 +46,74 @@ const DETERMINISTIC_RULES: RuleDefinition[] = [
     confidence: 0.98,
   },
   {
+    profilePath: "personal.email",
+    patterns: [/e[\s_-]?mail/i, /email[\s_-]?address/i],
+    getValue: (p) => p.personal.email || null,
+    confidence: 0.99,
+  },
+  {
+    profilePath: "personal.phone",
+    patterns: [/mobile[\s_-]?number/i, /mobile/i, /phone/i, /telephone/i, /contact[\s_-]?number/i, /cell/i],
+    getValue: (p) => p.personal.phone || null,
+    confidence: 0.98,
+  },
+  {
+    profilePath: "personal.gender",
+    patterns: [/\bgender\b/i, /\bsex\b/i],
+    getValue: (p) => (p.personal as any)?.gender || "Male",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "personal.dob",
+    patterns: [/date[\s_-]?of[\s_-]?birth/i, /\bd[\s_-]?o[\s_-]?b\b/i, /birth[\s_-]?date/i, /\bdob\b/i],
+    getValue: (p) => (p.personal as any)?.dob || "06/07/2005",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "personal.nationality",
+    patterns: [/nationality/i, /citizenship/i],
+    getValue: (p) => (p.personal as any)?.nationality || "Indian",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "personal.title",
+    patterns: [/\btitle\b/i, /salutation/i, /prefix/i],
+    getValue: (p) => {
+      const g = (p.personal as any)?.gender?.toLowerCase();
+      return g === "female" ? "Ms." : "Mr.";
+    },
+    confidence: 0.98,
+  },
+  {
+    profilePath: "personal.firstName",
+    patterns: [/first[\s_-]?name/i, /given[\s_-]?name/i, /fname/i],
+    getValue: (p) => p.personal.firstName || null,
+    confidence: 0.99,
+  },
+  {
+    profilePath: "personal.middleName",
+    patterns: [/middle[\s_-]?name/i, /mname/i],
+    getValue: (p) => (p.personal as any)?.middleName || "",
+    confidence: 0.96,
+  },
+  {
+    profilePath: "personal.lastName",
+    patterns: [/last[\s_-]?name/i, /surname/i, /family[\s_-]?name/i, /lname/i],
+    getValue: (p) => p.personal.lastName || null,
+    confidence: 0.99,
+  },
+  {
+    profilePath: "personal.fullName",
+    patterns: [
+      /^(\*|\s)*(full[\s_-]?name|your[\s_-]?name|candidate[\s_-]?name|applicant[\s_-]?name|legal[\s_-]?name)(\*|\s)*$/i,
+      /\bfull[\s_-]?name\b/i,
+      /\bcomplete[\s_-]?name\b/i,
+      /^(\*|\s)*name(\*|\s)*$/i,
+    ],
+    getValue: (p) => `${p.personal.firstName || ""} ${p.personal.lastName || ""}`.trim() || null,
+    confidence: 0.95,
+  },
+  {
     profilePath: "links.linkedin",
     patterns: [/linkedin/i, /linked[\s_-]?in/i],
     getValue: (p) => p.links.linkedin || null,
@@ -138,12 +143,47 @@ export function mapFieldDeterministically(
   field: FieldDescriptor,
   profile: UserProfile | null
 ): FieldMapping {
-  const cleanLabel = (field.rawLabel || "").replace(/[*:]/g, " ");
-  const labelToTest = `${cleanLabel} ${field.normalizedLabel || ""} ${field.name || ""} ${field.autocomplete || ""} ${field.nearbyText || ""}`;
+  const cleanLabel = (field.rawLabel || "").replace(/[*:]/g, " ").trim();
+  const directLabel = `${cleanLabel} ${field.normalizedLabel || ""}`.trim();
+  const fullContext = `${directLabel} ${field.name || ""} ${field.autocomplete || ""} ${field.nearbyText || ""}`.trim();
 
+  // 1. First pass: Match directly against clean label & normalized label
   for (const rule of DETERMINISTIC_RULES) {
     for (const pattern of rule.patterns) {
-      if (pattern.test(labelToTest)) {
+      if (pattern.test(directLabel)) {
+        const val = profile ? rule.getValue(profile) : null;
+        const confidence = rule.confidence;
+
+        let action: FieldMapping["action"] = "fill";
+        if (confidence >= CONFIDENCE_THRESHOLDS.AUTO_FILL) {
+          action = "fill";
+        } else if (confidence >= CONFIDENCE_THRESHOLDS.AUTO_FILL_REVIEW) {
+          action = "fill";
+        } else if (confidence >= CONFIDENCE_THRESHOLDS.ASK_USER) {
+          action = "review";
+        } else {
+          action = "unsupported";
+        }
+
+        return {
+          fieldId: field.id,
+          rawLabel: field.rawLabel,
+          normalizedLabel: field.normalizedLabel,
+          profilePath: rule.profilePath,
+          valueToFill: val,
+          confidence,
+          action,
+          source: "rule",
+          reason: `Matched pattern ${pattern.toString()}`,
+        };
+      }
+    }
+  }
+
+  // 2. Second pass: Match against full context (attributes, nearbyText)
+  for (const rule of DETERMINISTIC_RULES) {
+    for (const pattern of rule.patterns) {
+      if (pattern.test(fullContext)) {
         const val = profile ? rule.getValue(profile) : null;
         const confidence = rule.confidence;
 

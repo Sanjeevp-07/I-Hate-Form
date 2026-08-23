@@ -1,8 +1,12 @@
 export interface PersonalInfo {
   firstName: string;
+  middleName?: string;
   lastName: string;
   email: string;
   phone: string;
+  countryCode?: string;
+  dob?: string;
+  nationality?: string;
   address?: string;
   city?: string;
   state?: string;

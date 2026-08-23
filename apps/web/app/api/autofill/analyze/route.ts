@@ -37,22 +37,22 @@ const CANDIDATE_PROFILE_PATHS = [
 
 // Comprehensive deterministic rules mapping labels and attributes with maximum confidence
 const DETERMINISTIC_PATTERNS: Array<{ pattern: RegExp; path: string; confidence: number }> = [
-  { pattern: /^title\b|salutation|prefix/i, path: "personal.title", confidence: 0.98 },
-  { pattern: /first[\s_-]?name|given[\s_-]?name|fname/i, path: "personal.firstName", confidence: 0.99 },
-  { pattern: /middle[\s_-]?name|mname/i, path: "personal.middleName", confidence: 0.96 },
-  { pattern: /last[\s_-]?name|surname|family[\s_-]?name|lname/i, path: "personal.lastName", confidence: 0.99 },
-  { pattern: /^full[\s_-]?name$|^name$/i, path: "personal.fullName", confidence: 0.95 },
-  { pattern: /e[\s_-]?mail/i, path: "personal.email", confidence: 0.99 },
   { pattern: /country[\s_-]?code|dial[\s_-]?code|isd[\s_-]?code/i, path: "personal.countryCode", confidence: 0.98 },
-  { pattern: /phone|mobile|telephone|contact[\s_-]?number|cell\b/i, path: "personal.phone", confidence: 0.98 },
-  { pattern: /gender|sex\b/i, path: "personal.gender", confidence: 0.98 },
-  { pattern: /date[\s_-]?of[\s_-]?birth|d[\s_-]?o[\s_-]?b|birth[\s_-]?date|dob/i, path: "personal.dob", confidence: 0.98 },
-  { pattern: /nationality|citizenship/i, path: "personal.nationality", confidence: 0.98 },
   { pattern: /^country\b|current[\s_-]?country|nation\b/i, path: "personal.country", confidence: 0.98 },
   { pattern: /^state\b|province|region|state[\s_-]?\/?[\s_-]?province/i, path: "personal.state", confidence: 0.98 },
   { pattern: /^city\b|current[\s_-]?city|town\b/i, path: "personal.city", confidence: 0.98 },
   { pattern: /pincode|pin[\s_-]?code|postal[\s_-]?code|zip[\s_-]?code|zip\b/i, path: "personal.postalCode", confidence: 0.98 },
   { pattern: /current[\s_-]?street|locality|area|street[\s_-]?address|address[\s_-]?1|address|addr/i, path: "personal.address", confidence: 0.98 },
+  { pattern: /e[\s_-]?mail/i, path: "personal.email", confidence: 0.99 },
+  { pattern: /phone|mobile|telephone|contact[\s_-]?number|cell\b/i, path: "personal.phone", confidence: 0.98 },
+  { pattern: /gender|sex\b/i, path: "personal.gender", confidence: 0.98 },
+  { pattern: /date[\s_-]?of[\s_-]?birth|d[\s_-]?o[\s_-]?b|birth[\s_-]?date|dob/i, path: "personal.dob", confidence: 0.98 },
+  { pattern: /nationality|citizenship/i, path: "personal.nationality", confidence: 0.98 },
+  { pattern: /^title\b|salutation|prefix/i, path: "personal.title", confidence: 0.98 },
+  { pattern: /first[\s_-]?name|given[\s_-]?name|fname/i, path: "personal.firstName", confidence: 0.99 },
+  { pattern: /middle[\s_-]?name|mname/i, path: "personal.middleName", confidence: 0.96 },
+  { pattern: /last[\s_-]?name|surname|family[\s_-]?name|lname/i, path: "personal.lastName", confidence: 0.99 },
+  { pattern: /^(\*|\s)*(full[\s_-]?name|your[\s_-]?name|candidate[\s_-]?name|applicant[\s_-]?name|legal[\s_-]?name|name)(\*|\s)*$|\bfull[\s_-]?name\b/i, path: "personal.fullName", confidence: 0.95 },
   { pattern: /linkedin/i, path: "links.linkedin", confidence: 0.98 },
   { pattern: /github/i, path: "links.github", confidence: 0.98 },
   { pattern: /portfolio|personal[\s_-]?website|website/i, path: "links.portfolio", confidence: 0.98 },
@@ -61,9 +61,16 @@ const DETERMINISTIC_PATTERNS: Array<{ pattern: RegExp; path: string; confidence:
 ];
 
 function matchDeterministicRule(field: FieldDescriptor): { profilePath: string; confidence: number } | null {
-  const text = `${field.normalizedLabel} ${field.rawLabel} ${field.name || ""} ${field.autocomplete || ""} ${field.nearbyText || ""}`;
+  const directText = `${field.normalizedLabel} ${field.rawLabel}`.trim();
   for (const rule of DETERMINISTIC_PATTERNS) {
-    if (rule.pattern.test(text)) {
+    if (rule.pattern.test(directText)) {
+      return { profilePath: rule.path, confidence: rule.confidence };
+    }
+  }
+
+  const fullText = `${directText} ${field.name || ""} ${field.autocomplete || ""} ${field.nearbyText || ""}`.trim();
+  for (const rule of DETERMINISTIC_PATTERNS) {
+    if (rule.pattern.test(fullText)) {
       return { profilePath: rule.path, confidence: rule.confidence };
     }
   }

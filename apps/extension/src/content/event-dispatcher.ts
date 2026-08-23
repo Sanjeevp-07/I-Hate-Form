@@ -1,3 +1,5 @@
+import { findBestOptionMatch } from "./dropdown-matcher";
+
 export interface DispatchResult {
   success: boolean;
   valueRegistered: boolean;
@@ -14,6 +16,8 @@ export function setNativeValue(
 ): DispatchResult {
   try {
     let expectedValue = "";
+
+    let selectMatched = true;
 
     if (element instanceof HTMLInputElement) {
       if (element.type === "checkbox" || element.type === "radio") {
@@ -54,6 +58,12 @@ export function setNativeValue(
         } else {
           element.value = expectedValue;
         }
+
+        // Notify React's synthetic event system tracker if present
+        const tracker = (element as any)._valueTracker;
+        if (tracker && typeof tracker.setValue === "function") {
+          tracker.setValue("");
+        }
       }
     } else if (element instanceof HTMLTextAreaElement) {
       expectedValue = String(value);
@@ -66,89 +76,34 @@ export function setNativeValue(
       } else {
         element.value = expectedValue;
       }
-    } else if (element instanceof HTMLSelectElement) {
-      expectedValue = String(value).trim();
-      const lowerVal = expectedValue.toLowerCase();
 
-      // Advanced prioritized option matching
-      let matchedOption: HTMLOptionElement | null = null;
-      let highestScore = -1;
-
-      for (let i = 0; i < element.options.length; i++) {
-        const opt = element.options[i];
-        const optVal = opt.value.toLowerCase().trim();
-        const optText = opt.text.toLowerCase().trim();
-
-        // Skip placeholder options like "Please Select", "Select Country", "--"
-        if (i === 0 && (optText.includes("select") || optText === "-" || optText === "")) {
-          continue;
-        }
-
-        let score = 0;
-
-        // 1. Exact match on value or text
-        if (optVal === lowerVal || optText === lowerVal) {
-          score = 100;
-        }
-        // 2. Dial / Country code specific matching
-        else if (lowerVal === "+91" || lowerVal === "91") {
-          if (optText.includes("(+91)") || optText.includes("+91") || optVal === "+91" || optVal === "91") {
-            score = 95;
-          } else if (optText.includes("india")) {
-            score = 90;
-          }
-        }
-        // 3. Gender matching
-        else if (lowerVal === "male") {
-          if (optText === "male" || optVal === "male" || optVal === "m") {
-            score = 95;
-          } else if (optText.startsWith("male")) {
-            score = 90;
-          }
-        } else if (lowerVal === "female") {
-          if (optText === "female" || optVal === "female" || optVal === "f") {
-            score = 95;
-          }
-        }
-        // 4. Title matching
-        else if (lowerVal === "mr." || lowerVal === "mr") {
-          if (optText === "mr." || optText === "mr" || optVal === "mr." || optVal === "mr") {
-            score = 95;
-          }
-        }
-        // 5. Nationality & Country matching
-        else if (lowerVal === "indian" || lowerVal === "india") {
-          if (optText === "india" || optText === "indian" || optVal === "india" || optVal === "indian" || optVal === "ind" || optVal === "in") {
-            score = 95;
-          } else if (optText.includes("india") || optText.includes("indian")) {
-            score = 80;
-          }
-        }
-        // 6. State matching
-        else if (lowerVal === "uttar pradesh") {
-          if (optText === "uttar pradesh" || optVal === "uttar pradesh" || optVal === "up") {
-            score = 95;
-          } else if (optText.includes("uttar pradesh")) {
-            score = 85;
-          }
-        }
-        // 7. General word boundary / inclusion match
-        else if (optText.includes(lowerVal) || optVal.includes(lowerVal)) {
-          score = 50;
-        }
-
-        if (score > highestScore) {
-          highestScore = score;
-          matchedOption = opt;
-        }
+      // Notify React's synthetic event system tracker if present
+      const tracker = (element as any)._valueTracker;
+      if (tracker && typeof tracker.setValue === "function") {
+        tracker.setValue("");
       }
+    } else if (element instanceof HTMLSelectElement) {
+      const matchResult = findBestOptionMatch(
+        Array.from(element.options),
+        value
+      );
 
-      if (matchedOption && highestScore > 0) {
+      if (matchResult && matchResult.matchedIndex >= 0) {
+        const targetIndex = matchResult.matchedIndex;
+        const matchedOption = element.options[targetIndex];
+
         for (let i = 0; i < element.options.length; i++) {
-          element.options[i].selected = element.options[i] === matchedOption;
+          const isTarget = i === targetIndex;
+          element.options[i].selected = isTarget;
+          if (isTarget) {
+            element.options[i].setAttribute("selected", "selected");
+          } else {
+            element.options[i].removeAttribute("selected");
+          }
         }
-        element.selectedIndex = matchedOption.index;
-        expectedValue = matchedOption.value;
+
+        element.selectedIndex = targetIndex;
+        expectedValue = matchedOption ? (matchedOption.value !== undefined ? matchedOption.value : matchedOption.text) : matchResult.matchedValue;
 
         const descriptor = Object.getOwnPropertyDescriptor(
           window.HTMLSelectElement.prototype,
@@ -159,6 +114,20 @@ export function setNativeValue(
         } else {
           element.value = expectedValue;
         }
+
+        // Ensure selectedIndex didn't get reset
+        if (element.selectedIndex !== targetIndex) {
+          element.selectedIndex = targetIndex;
+        }
+
+        // Notify React's select value tracker
+        const tracker = (element as any)._valueTracker;
+        if (tracker && typeof tracker.setValue === "function") {
+          tracker.setValue("");
+        }
+      } else {
+        selectMatched = false;
+        expectedValue = String(value);
       }
     }
 
@@ -166,25 +135,39 @@ export function setNativeValue(
     try {
       element.dispatchEvent(new FocusEvent("focus", { bubbles: true, composed: true }));
 
-      // Dispatch InputEvent with insertText metadata for React 18/19 & modern web components
-      const inputEvent = typeof InputEvent === "function"
-        ? new InputEvent("input", {
-            bubbles: true,
-            composed: true,
-            data: expectedValue,
-            inputType: "insertText",
-          })
-        : new Event("input", { bubbles: true, composed: true });
-
-      element.dispatchEvent(inputEvent);
-
       if (element instanceof HTMLSelectElement) {
-        element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-        element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-        element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        // Standard change and input events for select elements
+        element.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+        element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+
+        const selOption = element.options[element.selectedIndex];
+        if (selOption) {
+          try {
+            selOption.dispatchEvent(new Event("change", { bubbles: true }));
+            selOption.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          } catch {}
+        }
+      } else {
+        // Dispatch InputEvent with insertText metadata for input/textarea
+        const inputEvent = typeof InputEvent === "function"
+          ? new InputEvent("input", {
+              bubbles: true,
+              composed: true,
+              data: expectedValue,
+              inputType: "insertText",
+            })
+          : new Event("input", { bubbles: true, composed: true });
+
+        element.dispatchEvent(inputEvent);
+        element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
       }
 
-      element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+      // Trigger jQuery / Select2 / Chosen custom events if page uses them
+      try {
+        element.dispatchEvent(new CustomEvent("select2:select", { bubbles: true }));
+        element.dispatchEvent(new CustomEvent("chosen:updated", { bubbles: true }));
+      } catch {}
+
       element.dispatchEvent(new FocusEvent("blur", { bubbles: true, composed: true }));
     } catch {
       return {
@@ -203,7 +186,10 @@ export function setNativeValue(
     } else if (element instanceof HTMLTextAreaElement && expectedValue) {
       registered = Boolean(element.value);
     } else if (element instanceof HTMLSelectElement) {
-      registered = element.selectedIndex >= 0;
+      const curOptText = element.options[element.selectedIndex]?.text || "";
+      const curVal = element.value || "";
+      const isPlaceholder = !curVal && (curOptText.toLowerCase().includes("select") || curOptText.toLowerCase().includes("choose") || curOptText.toLowerCase().includes("please"));
+      registered = selectMatched && element.selectedIndex >= 0 && !isPlaceholder;
     }
 
     return {

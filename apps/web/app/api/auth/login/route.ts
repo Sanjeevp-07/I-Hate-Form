@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
         sessionUser = {
           id: user.id,
           email: user.email,
-          name: user.name,
+          name: user.name || normalizedEmail.split("@")[0],
         };
       }
     } catch {

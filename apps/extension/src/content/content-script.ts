@@ -33,20 +33,27 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
     }
 
     if (message.type === "FILL_FIELDS") {
-      try {
-        const payload = message.payload as FillFieldsPayload;
-        const scanStats = scanFormFieldsWithStats();
-        const autofillResult = executeAutofill(scanStats.fields, payload.mappings);
+      (async () => {
+        try {
+          const payload = message.payload as FillFieldsPayload & { profile?: any };
+          const scanStats = scanFormFieldsWithStats();
+          const autofillResult = await executeAutofill(scanStats.fields, payload.mappings, payload.profile || null);
 
-        const resultPayload: FillResultPayload = {
-          filledFieldIds: autofillResult.filledFieldIds,
-          skippedFieldIds: autofillResult.skippedFieldIds,
-          errors: autofillResult.errors,
-        };
-        sendResponse(resultPayload);
-      } catch (err) {
-        sendResponse({ filledFieldIds: [], skippedFieldIds: [], errors: [{ fieldId: "global", errorCode: "FRAMEWORK_BLOCKED", message: String(err) }] });
-      }
+          const resultPayload: FillResultPayload & { resumeUpload?: any } = {
+            filledFieldIds: autofillResult.filledFieldIds,
+            skippedFieldIds: autofillResult.skippedFieldIds,
+            errors: autofillResult.errors,
+            resumeUpload: autofillResult.resumeUpload,
+          };
+          sendResponse(resultPayload);
+        } catch (err) {
+          sendResponse({
+            filledFieldIds: [],
+            skippedFieldIds: [],
+            errors: [{ fieldId: "global", errorCode: "FRAMEWORK_BLOCKED", message: String(err) }],
+          });
+        }
+      })();
       return true;
     }
   });

@@ -193,7 +193,7 @@ export function getOrCreateUser(email: string, name?: string, authProvider: "goo
 
 export function updateUserProfile(userIdOrEmail: string, profile: StoredProfile): StoredUser {
   const db = readDatabase();
-  let user = db.users[userIdOrEmail];
+  let user: StoredUser | undefined = db.users[userIdOrEmail];
 
   if (!user) {
     user = Object.values(db.users).find((u) => u.email.toLowerCase() === userIdOrEmail.toLowerCase());

@@ -35,7 +35,7 @@ describe("Phase 3 Acceptance: Framework-Controlled Inputs Autofill Engine (§8.6
     expect(stateDisplay.textContent).toBe("REGISTERED:Sanjeev Kumar");
   });
 
-  it("Executes autofill and returns filled field IDs without false successes", () => {
+  it("Executes autofill and returns filled field IDs without false successes", async () => {
     document.body.innerHTML = `
       <form>
         <label for="email">Email</label>
@@ -70,7 +70,7 @@ describe("Phase 3 Acceptance: Framework-Controlled Inputs Autofill Engine (§8.6
       },
     ];
 
-    const result = executeAutofill(fields, mappings);
+    const result = await executeAutofill(fields, mappings);
 
     expect(result.filledFieldIds).toContain("field_email_1");
     expect(result.skippedFieldIds).toHaveLength(0);
