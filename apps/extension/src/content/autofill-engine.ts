@@ -3,6 +3,7 @@ import { querySelectorAllDeep } from "./shadow-dom-walker";
 import { setNativeValue } from "./event-dispatcher";
 import { autoUploadResume, ResumeUploadResult } from "./resume-uploader";
 import { detectFieldValidationWarnings } from "./warning-detector";
+import { findBestOptionMatch } from "./dropdown-matcher";
 
 export interface AutofillFieldCorrection {
   fieldId: string;
@@ -329,25 +330,81 @@ export async function executeAutofill(
             correctedVal = digits || "0";
           }
         }
-        // 2. Select Dropdowns (e.g. Months*, Notice Period with "This field is required." or "Please Select")
+        // 2. Select Dropdowns (e.g. Title*, Country Code*, Gender*, Nationality*, Months*, Notice Period)
         else if (targetEl instanceof HTMLSelectElement || warn.fieldDescriptor.tag === "select") {
           const selectEl = targetEl as HTMLSelectElement;
-          if (/\bmonths?\b/i.test(combinedText)) {
-            const optMatch = Array.from(selectEl.options).find((o) => /^0\b|zero|none/i.test(o.text) || /^0\b/i.test(o.value)) || selectEl.options[1];
+          const optionsList = Array.from(selectEl.options);
+
+          // 2a. Title / Salutation / Prefix
+          if (/\btitle\b|salutation|prefix/i.test(combinedText)) {
+            const targetTitle = profile?.personal?.gender?.toLowerCase() === "female" ? "Ms." : "Mr.";
+            const match = findBestOptionMatch(optionsList, targetTitle);
+            if (match) correctedVal = match.matchedValue || match.matchedText;
+          }
+          // 2b. Country Code / Dial Code / ISD
+          else if (/country[\s_-]?code|dial[\s_-]?code|isd[\s_-]?code/i.test(combinedText)) {
+            const targetCode = profile?.personal?.countryCode || "+91";
+            const match = findBestOptionMatch(optionsList, targetCode);
+            if (match) correctedVal = match.matchedValue || match.matchedText;
+          }
+          // 2c. Gender / Sex
+          else if (/\bgender\b|\bsex\b/i.test(combinedText)) {
+            const targetGender = profile?.personal?.gender || "Male";
+            const match = findBestOptionMatch(optionsList, targetGender);
+            if (match) correctedVal = match.matchedValue || match.matchedText;
+          }
+          // 2d. Nationality
+          else if (/nationality|citizenship/i.test(combinedText)) {
+            const targetNat = profile?.personal?.nationality || "Indian";
+            const match = findBestOptionMatch(optionsList, targetNat);
+            if (match) correctedVal = match.matchedValue || match.matchedText;
+          }
+          // 2e. Country
+          else if (/\bcountry\b|nation\b/i.test(combinedText)) {
+            const targetCountry = profile?.personal?.country || "India";
+            const match = findBestOptionMatch(optionsList, targetCountry);
+            if (match) correctedVal = match.matchedValue || match.matchedText;
+          }
+          // 2f. State / Province
+          else if (/\bstate\b|province|region/i.test(combinedText)) {
+            const targetState = profile?.personal?.state || "Uttar Pradesh";
+            const match = findBestOptionMatch(optionsList, targetState);
+            if (match) correctedVal = match.matchedValue || match.matchedText;
+          }
+          // 2g. Experience Months
+          else if (/\bmonths?\b/i.test(combinedText)) {
+            const optMatch = optionsList.find((o) => /^0\b|zero|none/i.test(o.text) || /^0\b/i.test(o.value)) || optionsList[1];
+            if (optMatch) correctedVal = optMatch.value || optMatch.text;
+            else correctedVal = "0 months";
+          }
+          // 2h. Experience Years
+          else if (/\byears?\b/i.test(combinedText) || combinedText.includes("experience")) {
+            const optMatch = optionsList.find((o) => /^0\b|zero|none/i.test(o.text) || /^0\b/i.test(o.value)) || optionsList[1];
             if (optMatch) correctedVal = optMatch.value || optMatch.text;
             else correctedVal = "0";
-          } else if (/\byears?\b/i.test(combinedText) || combinedText.includes("experience")) {
-            const optMatch = Array.from(selectEl.options).find((o) => /^0\b|zero|none/i.test(o.text) || /^0\b/i.test(o.value)) || selectEl.options[1];
+          }
+          // 2i. Notice Period / Availability
+          else if (/notice|availability/i.test(combinedText)) {
+            const optMatch = optionsList.find((o) => /immediate|0[\s_-]?days?|15[\s_-]?days?|<[\s_-]?1[\s_-]?month/i.test(o.text)) || optionsList[1];
             if (optMatch) correctedVal = optMatch.value || optMatch.text;
-            else correctedVal = "0";
-          } else if (selectEl.options && selectEl.options.length > 1) {
-            const validOpt = Array.from(selectEl.options).find((o) => o.value && !/please select|--|choose/i.test(o.text)) || selectEl.options[1];
-            if (validOpt) correctedVal = validOpt.value || validOpt.text;
+            else correctedVal = "Immediate Joiner";
           }
         }
-        // 3. Required text / number / boolean fields
+        // 3. Required text / number / boolean / select fields
         else if (warnText.includes("required") || warnText.includes("blank") || warnText.includes("empty") || warnText.includes("property")) {
-          if (/\bmonths?\b/i.test(combinedText) || /\byears?\b/i.test(combinedText) || (combinedText.includes("ctc") && !combinedText.includes("expect"))) {
+          if (targetEl instanceof HTMLSelectElement) {
+            if (/\bmonths?\b/i.test(combinedText)) {
+              correctedVal = "0 months";
+            } else if (/\byears?\b/i.test(combinedText)) {
+              correctedVal = "0";
+            } else if (/notice|availability/i.test(combinedText)) {
+              correctedVal = "Immediate Joiner";
+            } else {
+              const best = findBestOptionMatch(Array.from(targetEl.options), "0");
+              if (best) correctedVal = best.matchedValue || best.matchedText;
+              else correctedVal = "0";
+            }
+          } else if (/\bmonths?\b/i.test(combinedText) || /\byears?\b/i.test(combinedText) || (combinedText.includes("ctc") && !combinedText.includes("expect"))) {
             correctedVal = "0";
           } else if (combinedText.includes("expect") && combinedText.includes("ctc")) {
             correctedVal = "3";

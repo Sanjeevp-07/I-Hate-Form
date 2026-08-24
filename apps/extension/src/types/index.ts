@@ -6,6 +6,7 @@ export interface ExtensionMessage<T = unknown> {
     | "SCAN_RESULT"
     | "FILL_FIELDS"
     | "FILL_RESULT"
+    | "UPLOAD_RESUME"
     | "GET_SESSION_STATE"
     | "SET_SESSION_STATE"
     | "OPEN_SIDEPANEL";

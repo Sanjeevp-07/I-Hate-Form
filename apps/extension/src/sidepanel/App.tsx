@@ -3,7 +3,7 @@ import { FieldDescriptor, FieldError, FieldMapping } from "@internship-copilot/t
 import { CONFIDENCE_THRESHOLDS } from "@internship-copilot/config";
 import { mapFieldDeterministically } from "../content/field-mapper";
 import { getSessionState, setSessionState } from "../storage/chrome-storage";
-import { Shield, Play, RefreshCw, Sparkles, Lock, Layers, AlertCircle, CheckCircle2, LogIn, ChevronDown, FileText } from "lucide-react";
+import { Shield, Play, RefreshCw, Sparkles, Lock, Layers, AlertCircle, CheckCircle2, LogIn, ChevronDown, FileText, Upload } from "lucide-react";
 
 const BACKEND_BASE_URL = "http://localhost:3000";
 
@@ -210,9 +210,20 @@ export const App: React.FC = () => {
 
     setIsGeneratingAI(true);
     try {
-      // Filter fields that do not have deterministic static values
-      const unmappedFields = fieldsToProcess.filter((_, idx) => {
+      // Filter fields: NVIDIA NIM only suggests for fields whose details are NOT stored in the Database
+      const unmappedFields = fieldsToProcess.filter((f, idx) => {
         const m = existingMappings[idx];
+        // If this field is already mapped to a static database profile property, NEVER send to AI!
+        if (m?.profilePath) return false;
+
+        // Also check if field matches any standard database profile field
+        const combined = `${f.normalizedLabel} ${f.rawLabel} ${f.name || ""} ${f.nearbyText || ""}`.toLowerCase();
+        const isStaticDatabaseField = /first[\s_-]?name|last[\s_-]?name|middle[\s_-]?name|full[\s_-]?name|e[\s_-]?mail|phone|mobile|country[\s_-]?code|dial[\s_-]?code|isd[\s_-]?code|gender|\bsex\b|nationality|citizenship|\btitle\b|salutation|prefix|date[\s_-]?of[\s_-]?birth|d[\s_-]?o[\s_-]?b|pincode|postal|zip|state|province|city|country|address|street|linkedin|github/i.test(combined);
+
+        if (isStaticDatabaseField) {
+          return false;
+        }
+
         return !m || m.valueToFill === null || m.valueToFill === undefined || m.valueToFill === "" || m.action === "unsupported" || m.action === "review";
       });
 
@@ -237,6 +248,13 @@ export const App: React.FC = () => {
 
         const mergedMappings = fieldsToProcess.map((f, idx) => {
           const current = existingMappings[idx];
+          // If current is a database profile field, preserve deterministic database value
+          if (current?.profilePath) return current;
+
+          const combined = `${f.normalizedLabel} ${f.rawLabel} ${f.name || ""}`.toLowerCase();
+          const isStaticDatabaseField = /first[\s_-]?name|last[\s_-]?name|middle[\s_-]?name|full[\s_-]?name|e[\s_-]?mail|phone|mobile|country[\s_-]?code|dial[\s_-]?code|isd[\s_-]?code|gender|\bsex\b|nationality|citizenship|\btitle\b|salutation|prefix|date[\s_-]?of[\s_-]?birth|d[\s_-]?o[\s_-]?b|pincode|postal|zip|state|province|city|country|address|street|linkedin|github/i.test(combined);
+          if (isStaticDatabaseField) return current;
+
           const aiMatch = aiMappings.find((aim) => aim.fieldId === f.id);
 
           if (aiMatch && aiMatch.valueToFill !== null && aiMatch.valueToFill !== undefined) {
@@ -404,6 +422,46 @@ export const App: React.FC = () => {
     }
   };
 
+  const [isUploadingResume, setIsUploadingResume] = useState<boolean>(false);
+
+  const handleUploadResumeOnly = async () => {
+    setIsUploadingResume(true);
+    try {
+      if (typeof chrome !== "undefined" && chrome.tabs) {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id) {
+          await ensureContentScriptInjected(tab.id);
+
+          chrome.tabs.sendMessage(
+            tab.id,
+            {
+              type: "UPLOAD_RESUME",
+              payload: { profile: userProfile },
+            },
+            (response) => {
+              setIsUploadingResume(false);
+              if (response?.uploadResult?.uploaded) {
+                setFillSummary((prev) => ({
+                  filled: prev?.filled || 0,
+                  skipped: prev?.skipped || 0,
+                  resumeUploaded: true,
+                  resumeName: response.uploadResult.fileName,
+                  corrections: prev?.corrections || [],
+                }));
+              }
+            }
+          );
+        } else {
+          setIsUploadingResume(false);
+        }
+      } else {
+        setIsUploadingResume(false);
+      }
+    } catch {
+      setIsUploadingResume(false);
+    }
+  };
+
   // If loading auth
   if (authState.loading) {
     return (
@@ -544,7 +602,7 @@ export const App: React.FC = () => {
           className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 bg-gradient-to-r from-violet-700 via-indigo-600 to-cyan-600 hover:from-violet-600 hover:to-cyan-500 active:scale-98 transition text-white rounded-lg text-xs font-semibold shadow-md shadow-indigo-950/50 border border-indigo-400/30 disabled:opacity-50 cursor-pointer"
         >
           <Sparkles className={`w-3.5 h-3.5 ${isGeneratingAI ? "animate-spin text-amber-300" : "text-amber-300 fill-amber-300"}`} />
-          <span>{isGeneratingAI ? "NVIDIA NIM Generating Answers..." : "✨ Auto-Generate with NVIDIA AI"}</span>
+          <span>{isGeneratingAI ? "NVIDIA NIM Generating Answers..." : "Auto-Generate with NVIDIA AI"}</span>
         </button>
       )}
 
@@ -590,8 +648,8 @@ export const App: React.FC = () => {
 
       {/* Resume PDF Auto-Upload Indicator (Only rendered when resume upload field is present on form) */}
       {hasResumeField && (
-        <div className="mt-2.5 p-2 bg-indigo-950/40 border border-indigo-800/40 rounded-lg text-xs flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-indigo-300 font-medium truncate">
+        <div className="mt-2.5 p-2 bg-indigo-950/40 border border-indigo-800/40 rounded-lg text-xs flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-indigo-300 font-medium truncate flex-1">
             <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             <span className="truncate">
               {userProfile?.personal
@@ -599,9 +657,14 @@ export const App: React.FC = () => {
                 : "Sanjeev_Kumar_Resume.pdf"}
             </span>
           </div>
-          <span className="text-[10px] px-1.5 py-0.5 bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 rounded font-medium shrink-0">
-            Uploads 1st
-          </span>
+          <button
+            onClick={handleUploadResumeOnly}
+            disabled={isUploadingResume}
+            className="text-[10px] px-2 py-0.5 bg-indigo-900/70 hover:bg-indigo-800 active:scale-95 text-indigo-200 border border-indigo-700/50 rounded font-medium shrink-0 cursor-pointer transition flex items-center gap-1"
+          >
+            <Upload className="w-3 h-3" />
+            <span>{isUploadingResume ? "Uploading..." : "Upload Resume"}</span>
+          </button>
         </div>
       )}
 
@@ -617,7 +680,8 @@ export const App: React.FC = () => {
           </div>
           {fillSummary.resumeUploaded && (
             <div className="flex items-center gap-1.5 text-[11px] text-emerald-400/90 pl-5">
-              <span>📄 Resume PDF "{fillSummary.resumeName}" uploaded</span>
+              <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Resume PDF "{fillSummary.resumeName}" uploaded</span>
             </div>
           )}
           {fillSummary.corrections && fillSummary.corrections.length > 0 && (

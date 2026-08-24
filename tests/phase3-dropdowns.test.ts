@@ -66,6 +66,38 @@ describe("Phase 3: Dropdown Option Matching & Robust Autofill", () => {
       const matchDial = findBestOptionMatch(dialOptions, "+91");
       expect(matchDial?.matchedIndex).toBe(2);
     });
+
+    it("matches numeric Months options like '0 months' when target is '0'", () => {
+      const monthOptions = [
+        { index: 0, value: "", label: "Please Select" },
+        { index: 1, value: "0", label: "0 months" },
+        { index: 2, value: "1", label: "1 months" },
+        { index: 3, value: "2", label: "2 months" },
+        { index: 11, value: "10", label: "10 months" },
+        { index: 12, value: "11", label: "11 months" },
+      ];
+
+      const match0 = findBestOptionMatch(monthOptions, "0");
+      expect(match0).not.toBeNull();
+      expect(match0?.matchedIndex).toBe(1);
+      expect(match0?.matchedText).toBe("0 months");
+
+      const match10 = findBestOptionMatch(monthOptions, "10");
+      expect(match10?.matchedIndex).toBe(11);
+    });
+
+    it("matches Notice Period options accurately", () => {
+      const noticeOptions = [
+        { index: 0, value: "", label: "Please Select" },
+        { index: 1, value: "immediate_joiner", label: "Immediate Joiner" },
+        { index: 2, value: "15_days", label: "15 Days" },
+        { index: 3, value: "1_month", label: "1 Month" },
+      ];
+
+      const matchNotice = findBestOptionMatch(noticeOptions, "Immediate");
+      expect(matchNotice).not.toBeNull();
+      expect(matchNotice?.matchedIndex).toBe(1);
+    });
   });
 
   describe("setNativeValue on HTMLSelectElement", () => {

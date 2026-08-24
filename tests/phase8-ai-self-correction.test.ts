@@ -103,7 +103,8 @@ describe("Phase 8: Post-Autofill Validation Warning Detection & NVIDIA NIM Self-
       ],
     });
 
-    expect(system).toContain("Validation Error Self-Correction");
+    expect(system).toContain("VALIDATION ERROR SELF-CORRECTION");
+    expect(system).toContain("STRICT DATABASE ISOLATION");
     expect(user).toContain("Please enter in numbers");
     expect(user).toContain("3.5");
   });
@@ -256,5 +257,94 @@ describe("Phase 8: Post-Autofill Validation Warning Detection & NVIDIA NIM Self-
     expect(result.filledFieldIds).toContain("f_months");
     expect(result.corrections).toBeDefined();
     expect(result.corrections?.some((c) => c.fieldId === "f_months")).toBe(true);
+  });
+
+  it("Accurately autofills Title* as 'Mr.' (never 'Miss.') and Country Code* as 'India (+91)' (never 'Afghanistan (+93)')", async () => {
+    document.body.innerHTML = `
+      <form id="jakson-form">
+        <div class="form-group">
+          <label for="title">Title*</label>
+          <select id="title" name="title">
+            <option value="">Please Select</option>
+            <option value="Miss.">Miss.</option>
+            <option value="Mr.">Mr.</option>
+            <option value="Mrs.">Mrs.</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="country_code">Country Code*</label>
+          <select id="country_code" name="country_code">
+            <option value="">Please Select</option>
+            <option value="AFG_93">Afghanistan (+93)</option>
+            <option value="IND_91">India (+91)</option>
+            <option value="USA_1">United States (+1)</option>
+          </select>
+        </div>
+      </form>
+    `;
+
+    const titleSelect = document.getElementById("title") as HTMLSelectElement;
+    const countryCodeSelect = document.getElementById("country_code") as HTMLSelectElement;
+
+    const fields: FieldDescriptor[] = [
+      {
+        id: "f_title",
+        frameId: 0,
+        tag: "select",
+        type: "select",
+        name: "title",
+        rawLabel: "Title*",
+        normalizedLabel: "title",
+        domSelector: "#title",
+        domSelectorHash: "h_title",
+      },
+      {
+        id: "f_country_code",
+        frameId: 0,
+        tag: "select",
+        type: "select",
+        name: "country_code",
+        rawLabel: "Country Code*",
+        normalizedLabel: "country code",
+        domSelector: "#country_code",
+        domSelectorHash: "h_country_code",
+      },
+    ];
+
+    const mappings = [
+      {
+        fieldId: "f_title",
+        rawLabel: "Title*",
+        normalizedLabel: "title",
+        profilePath: "personal.title",
+        valueToFill: "Mr.",
+        confidence: 0.98,
+        action: "fill" as const,
+        source: "rule" as const,
+      },
+      {
+        fieldId: "f_country_code",
+        rawLabel: "Country Code*",
+        normalizedLabel: "country code",
+        profilePath: "personal.countryCode",
+        valueToFill: "+91",
+        confidence: 0.98,
+        action: "fill" as const,
+        source: "rule" as const,
+      },
+    ];
+
+    const result = await executeAutofill(fields, mappings, mockProfile);
+
+    // Verify Title is Mr. (not Miss.)
+    expect(titleSelect.value).toBe("Mr.");
+    expect(titleSelect.options[titleSelect.selectedIndex].text).toBe("Mr.");
+
+    // Verify Country Code is India (+91) (not Afghanistan)
+    expect(countryCodeSelect.value).toBe("IND_91");
+    expect(countryCodeSelect.options[countryCodeSelect.selectedIndex].text).toBe("India (+91)");
+
+    expect(result.filledFieldIds).toContain("f_title");
+    expect(result.filledFieldIds).toContain("f_country_code");
   });
 });

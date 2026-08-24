@@ -132,26 +132,35 @@ startxref
 }
 
 /**
-/**
- * Checks if an element is currently rendered and visible (not display:none, visibility:hidden, or inside hidden wizard tabs).
+ * Checks if a file upload element or its parent container is part of the currently visible active DOM tree
+ * (returns false if the input or any of its ancestor containers is hidden in an inactive wizard tab / step).
  */
-export function isElementVisible(element: HTMLElement): boolean {
-  // Check inline or ancestor hidden styles/attributes
-  if (element.closest('[style*="display: none"], [style*="display:none"], [hidden], .hidden, [aria-hidden="true"]')) {
+export function isFileInputActive(element: HTMLInputElement): boolean {
+  if (!element || !element.isConnected) return false;
+
+  // 1. Check if the element itself or any ancestor has hidden attributes or common hidden classes
+  if (
+    element.closest(
+      '[aria-hidden="true"], [hidden], .hidden, .hide, .d-none, .ng-hide, [style*="display: none"], [style*="display:none"], .tab-pane:not(.active), .step:not(.active), .wizard-pane:not(.active), .wizard-step:not(.active)'
+    )
+  ) {
     return false;
   }
 
+  // 2. Iterate up the ancestor tree all the way to documentElement and verify computed visibility
   if (typeof window !== "undefined" && typeof window.getComputedStyle === "function") {
-    let current: HTMLElement | null = element;
-    while (current && current !== document.body) {
-      const style = window.getComputedStyle(current);
-      if (style.display === "none" || style.visibility === "hidden") {
-        return false;
-      }
-      if (style.opacity === "0" && current !== element) {
-        return false;
-      }
-      current = current.parentElement;
+    let curr: HTMLElement | null = element.parentElement;
+    while (curr && curr !== document.body && curr !== document.documentElement) {
+      try {
+        const style = window.getComputedStyle(curr);
+        if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+          return false;
+        }
+        if (curr.hasAttribute("hidden") || curr.getAttribute("aria-hidden") === "true") {
+          return false;
+        }
+      } catch {}
+      curr = curr.parentElement;
     }
   }
 
@@ -159,16 +168,16 @@ export function isElementVisible(element: HTMLElement): boolean {
 }
 
 /**
- * Searches the DOM and all accessible shadow roots for visible Resume / CV file upload elements.
+ * Searches the DOM and all accessible shadow roots for Resume / CV file upload elements.
  */
 export function findResumeUploadInputs(): HTMLInputElement[] {
   const allFileInputs = querySelectorAllDeep('input[type="file"]') as HTMLInputElement[];
   const resumeInputs: HTMLInputElement[] = [];
 
-  const resumeKeywords = /resume|cv\b|curriculum|biodata|profile[\s_-]?upload|attach[\s_-]?resume|upload[\s_-]?resume|upload[\s_-]?cv|upload[\s_-]?document/i;
+  const resumeKeywords = /resume|cv\b|curriculum|biodata|profile[\s_-]?upload|attach[\s_-]?resume|upload[\s_-]?resume|upload[\s_-]?cv|upload[\s_-]?document|document/i;
 
   for (const input of allFileInputs) {
-    if (!isElementVisible(input)) {
+    if (!isFileInputActive(input)) {
       continue;
     }
 
@@ -176,17 +185,26 @@ export function findResumeUploadInputs(): HTMLInputElement[] {
     const id = input.getAttribute("id") || "";
     const accept = (input.getAttribute("accept") || "").toLowerCase();
     const ariaLabel = input.getAttribute("aria-label") || "";
-    const parentText = (input.parentElement?.textContent || "").slice(0, 150);
+    const parentText = (input.parentElement?.textContent || "").slice(0, 200);
     const label = input.closest("label") || (input.id ? document.querySelector(`label[for="${input.id}"]`) : null);
-    const labelText = (label?.textContent || "").slice(0, 150);
+    const labelText = (label?.textContent || "").slice(0, 200);
+    const container = input.closest('form, section, div[class*="upload"], div[class*="resume"], div[class*="drop"], div[class*="file"]');
+    const containerText = (container?.textContent || "").slice(0, 300);
     const dataAutomation = input.getAttribute("data-automation-id") || "";
 
-    const textBlob = `${name} ${id} ${ariaLabel} ${labelText} ${parentText} ${dataAutomation}`.toLowerCase();
+    const textBlob = `${name} ${id} ${ariaLabel} ${labelText} ${parentText} ${containerText} ${dataAutomation}`.toLowerCase();
 
-    const isPdfAccept = accept.includes("pdf") || accept.includes("doc") || accept.includes("docx");
+    // Skip photo/avatar uploaders
+    const isImageOnly = (accept.includes("image") || accept.includes("png") || accept.includes("jpeg") || accept.includes("jpg")) && !accept.includes("pdf") && !accept.includes("doc");
+    const isAvatar = /avatar|photo|profile[\s_-]?pic|picture|selfie|headshot/i.test(textBlob);
+    if (isImageOnly || isAvatar) {
+      continue;
+    }
+
+    const isPdfAccept = accept.includes("pdf") || accept.includes("doc") || accept.includes("docx") || accept === "" || accept.includes("*");
     const matchesResumeKeyword = resumeKeywords.test(textBlob);
 
-    // Only consider it a resume input if it explicitly accepts PDF/DOC documents OR its label/surrounding context matches resume/cv keywords
+    // If accept matches or text matches or it is the primary file input on the active form
     if (matchesResumeKeyword || isPdfAccept) {
       resumeInputs.push(input);
     }
@@ -222,8 +240,9 @@ export function autoUploadResume(profile: UserProfile | null): ResumeUploadResul
 
   for (const input of fileInputs) {
     try {
+      let dataTransfer: DataTransfer | null = null;
       if (typeof DataTransfer !== "undefined") {
-        const dataTransfer = new DataTransfer();
+        dataTransfer = new DataTransfer();
         dataTransfer.items.add(pdfFile);
         input.files = dataTransfer.files;
       } else {
@@ -234,17 +253,46 @@ export function autoUploadResume(profile: UserProfile | null): ResumeUploadResul
         });
       }
 
-      // Dispatch full bubbling events for React/Angular/Vue/native form listeners
+      // Native prototype descriptor setter for React 18/19 synthetic event systems
+      try {
+        const proto = window.HTMLInputElement.prototype;
+        const descriptor = Object.getOwnPropertyDescriptor(proto, "files");
+        if (descriptor && descriptor.set && dataTransfer) {
+          descriptor.set.call(input, dataTransfer.files);
+        }
+      } catch {}
+
+      // Dispatch full bubbling events on input
       input.dispatchEvent(new Event("focus", { bubbles: true }));
       input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
       input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-      input.dispatchEvent(new Event("blur", { bubbles: true }));
 
-      // Also trigger on closest dropzones or file labels if present
-      const label = input.closest("label") || document.querySelector(`label[for="${input.id}"]`);
+      // Dispatch drag & drop event if page uses Dropzone / React Dropzone
+      if (dataTransfer && typeof DragEvent !== "undefined") {
+        try {
+          const dropEvent = new DragEvent("drop", {
+            bubbles: true,
+            composed: true,
+            dataTransfer,
+          });
+          input.dispatchEvent(dropEvent);
+          if (input.parentElement) {
+            input.parentElement.dispatchEvent(dropEvent);
+          }
+          const dropContainer = input.closest('div[class*="drop"], div[class*="upload"], label');
+          if (dropContainer) {
+            dropContainer.dispatchEvent(dropEvent);
+          }
+        } catch {}
+      }
+
+      // Also trigger on closest label
+      const label = input.closest("label") || (input.id ? document.querySelector(`label[for="${input.id}"]`) : null);
       if (label) {
         label.dispatchEvent(new Event("change", { bubbles: true }));
       }
+
+      input.dispatchEvent(new Event("blur", { bubbles: true }));
 
       uploadedCount++;
     } catch (err) {

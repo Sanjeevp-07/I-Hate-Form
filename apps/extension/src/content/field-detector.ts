@@ -38,11 +38,36 @@ function findLabelForElement(element: HTMLElement): string {
     if (labelledEl && labelledEl.textContent) return labelledEl.textContent.trim();
   }
 
-  // 4. Placeholder
+  // 4. Placeholder (if not a generic placeholder like "Please Select" or "Enter value")
   const placeholder = element.getAttribute("placeholder");
-  if (placeholder) return placeholder.trim();
+  if (placeholder && !/^please[\s_-]?select/i.test(placeholder) && !/^select/i.test(placeholder)) {
+    return placeholder.trim();
+  }
 
-  // 5. Name or ID attribute fallback
+  // 5. Container / Field-group label search
+  const containerLabel = element.closest(
+    '.form-group, .field-wrapper, .field, .form-field, div[class*="form"], div[class*="field"], div[class*="group"], div[class*="select"], div[class*="item"]'
+  )?.querySelector("label");
+  if (containerLabel && containerLabel.textContent) {
+    return containerLabel.textContent.trim();
+  }
+
+  // 6. Preceding sibling label search
+  let prev = element.previousElementSibling || element.parentElement?.previousElementSibling;
+  if (prev) {
+    const lbl = prev.tagName.toLowerCase() === "label" ? prev : prev.querySelector("label");
+    if (lbl && lbl.textContent) {
+      return lbl.textContent.trim();
+    }
+  }
+
+  // 7. Title, data-testid, data-automation-id
+  const testId = element.getAttribute("data-automation-id") || element.getAttribute("data-testid") || element.getAttribute("title");
+  if (testId) {
+    return testId.replace(/[_-]/g, " ").trim();
+  }
+
+  // 8. Name or ID attribute fallback
   const name = element.getAttribute("name");
   if (name) return name.replace(/[_-]/g, " ").trim();
 

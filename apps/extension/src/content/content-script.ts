@@ -1,6 +1,6 @@
 import { scanFormFieldsWithStats } from "./dom-scanner";
 import { executeAutofill } from "./autofill-engine";
-import { findResumeUploadInputs } from "./resume-uploader";
+import { findResumeUploadInputs, autoUploadResume } from "./resume-uploader";
 import { FrameRegistry } from "./frame-registry";
 import { FormMutationWatcher } from "./mutation-observer";
 import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPayload } from "../types";
@@ -58,6 +58,17 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
           });
         }
       })();
+      return true;
+    }
+
+    if (message.type === "UPLOAD_RESUME") {
+      try {
+        const payload = message.payload as { profile?: any };
+        const uploadResult = autoUploadResume(payload?.profile || null);
+        sendResponse({ success: uploadResult.uploaded, uploadResult });
+      } catch (err) {
+        sendResponse({ success: false, error: String(err) });
+      }
       return true;
     }
   });

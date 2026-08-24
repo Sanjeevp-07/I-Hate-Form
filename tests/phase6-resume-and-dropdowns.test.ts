@@ -137,6 +137,31 @@ describe("Phase 6: Country Mapping, Dropdown Autofill & Resume PDF Auto-Upload",
     expect(result.elementCount).toBe(0);
   });
 
+  it("Does NOT upload resume when input is inside a deeply nested hidden wizard panel (e.g. .d-none or [aria-hidden='true'])", () => {
+    document.body.innerHTML = `
+      <div class="phenom-wizard">
+        <div class="wizard-step step-1 d-none" aria-hidden="true">
+          <div class="section-container">
+            <div class="file-upload-wrapper">
+              <label for="resumeUpload">Upload Resume</label>
+              <input type="file" id="resumeUpload" name="resume" accept=".pdf,.doc,.docx" />
+            </div>
+          </div>
+        </div>
+        <div class="wizard-step step-2 active">
+          <label for="exp_years">Years*</label>
+          <input type="text" id="exp_years" name="years" />
+        </div>
+      </div>
+    `;
+
+    const result = autoUploadResume(mockProfile);
+
+    expect(result.detected).toBe(false);
+    expect(result.uploaded).toBe(false);
+    expect(result.elementCount).toBe(0);
+  });
+
   it("Does NOT upload resume to generic non-document file inputs (e.g. photo avatar uploaders)", () => {
     document.body.innerHTML = `
       <form id="profile-pic-form">

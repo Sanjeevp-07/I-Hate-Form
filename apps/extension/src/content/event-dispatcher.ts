@@ -64,6 +64,23 @@ export function setNativeValue(
         if (tracker && typeof tracker.setValue === "function") {
           tracker.setValue("");
         }
+
+        // Check for combobox / custom dropdown parent container and sibling elements
+        const parentContainer = element.closest(
+          'div[class*="select"], div[class*="dropdown"], div[class*="combobox"], .form-group, .field-wrapper, .custom-select, div[class*="input"], div[class*="field"]'
+        );
+        if (parentContainer) {
+          const hiddenSelect = parentContainer.querySelector("select");
+          if (hiddenSelect && (hiddenSelect as any) !== element) {
+            setNativeValue(hiddenSelect, expectedValue);
+          }
+          const customTextSpan = parentContainer.querySelector(
+            '.select-value, .dropdown-text, .selected-value, .filter-option-inner-inner, span[class*="label"], span[class*="text"], span[class*="value"], .selected-option'
+          );
+          if (customTextSpan) {
+            customTextSpan.textContent = expectedValue.includes("months") ? expectedValue : (expectedValue === "0" ? "0 months" : expectedValue);
+          }
+        }
       }
     } else if (element instanceof HTMLTextAreaElement) {
       expectedValue = String(value);
@@ -103,21 +120,24 @@ export function setNativeValue(
         }
 
         element.selectedIndex = targetIndex;
-        expectedValue = matchedOption ? (matchedOption.value !== undefined ? matchedOption.value : matchedOption.text) : matchResult.matchedValue;
+        expectedValue = matchedOption ? (matchedOption.value !== undefined && matchedOption.value !== "" ? matchedOption.value : matchedOption.text) : matchResult.matchedValue;
 
         const descriptor = Object.getOwnPropertyDescriptor(
           window.HTMLSelectElement.prototype,
           "value"
         );
-        if (descriptor && descriptor.set) {
-          descriptor.set.call(element, expectedValue);
-        } else {
+        if (descriptor && descriptor.set && expectedValue) {
+          try {
+            descriptor.set.call(element, expectedValue);
+          } catch {}
+        } else if (expectedValue) {
           element.value = expectedValue;
         }
 
         // Ensure selectedIndex didn't get reset
-        if (element.selectedIndex !== targetIndex) {
-          element.selectedIndex = targetIndex;
+        element.selectedIndex = targetIndex;
+        if (matchedOption) {
+          matchedOption.selected = true;
         }
 
         // Notify React's select value tracker
@@ -136,16 +156,48 @@ export function setNativeValue(
       element.dispatchEvent(new FocusEvent("focus", { bubbles: true, composed: true }));
 
       if (element instanceof HTMLSelectElement) {
-        // Standard change and input events for select elements
+        // Standard change, input and mouse events for select elements
+        element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+        element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+        element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
         element.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
         element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
 
         const selOption = element.options[element.selectedIndex];
         if (selOption) {
           try {
-            selOption.dispatchEvent(new Event("change", { bubbles: true }));
-            selOption.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+            selOption.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+            selOption.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+            selOption.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
           } catch {}
+        }
+
+        // Update custom dropdown wrappers (e.g. Phenom People / custom styled select / Bootstrap)
+        const parentContainer = element.closest(
+          'div[class*="select"], div[class*="dropdown"], div[class*="combobox"], .form-group, .field-wrapper, .custom-select, div[class*="input"], div[class*="field"]'
+        );
+        if (parentContainer) {
+          parentContainer.dispatchEvent(new Event("input", { bubbles: true }));
+          parentContainer.dispatchEvent(new Event("change", { bubbles: true }));
+          const customTextSpan = parentContainer.querySelector(
+            '.select-value, .dropdown-text, .selected-value, .filter-option-inner-inner, span[class*="label"], span[class*="text"], span[class*="value"], .selected-option'
+          );
+          if (customTextSpan && selOption) {
+            customTextSpan.textContent = selOption.text;
+          }
+          const siblingInput = parentContainer.querySelector("input");
+          if (siblingInput && (siblingInput as any) !== element) {
+            try {
+              const inputDesc = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
+              if (inputDesc && inputDesc.set) {
+                inputDesc.set.call(siblingInput, selOption?.text || expectedValue);
+              } else {
+                siblingInput.value = selOption?.text || expectedValue;
+              }
+              siblingInput.dispatchEvent(new Event("input", { bubbles: true }));
+              siblingInput.dispatchEvent(new Event("change", { bubbles: true }));
+            } catch {}
+          }
         }
       } else {
         // Dispatch InputEvent with insertText metadata for input/textarea
@@ -160,6 +212,28 @@ export function setNativeValue(
 
         element.dispatchEvent(inputEvent);
         element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+
+        // Try clicking matching dropdown option item in DOM if popup is rendered
+        const parentContainer = element.closest(
+          'div[class*="select"], div[class*="dropdown"], div[class*="combobox"], .form-group, .field-wrapper, .custom-select, div[class*="input"], div[class*="field"]'
+        );
+        if (parentContainer) {
+          const listItems = Array.from(
+            document.querySelectorAll('[role="option"], .dropdown-item, .select-option, li[data-value], div[class*="option"]')
+          ) as HTMLElement[];
+          const targetOptText = expectedValue.includes("months") ? expectedValue : (expectedValue === "0" ? "0 months" : expectedValue);
+          const matchedLi = listItems.find((li) => {
+            const liText = (li.textContent || "").trim().toLowerCase();
+            return liText === targetOptText.toLowerCase() || liText === expectedValue.toLowerCase();
+          });
+          if (matchedLi) {
+            try {
+              matchedLi.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+              matchedLi.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+              matchedLi.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+            } catch {}
+          }
+        }
       }
 
       // Trigger jQuery / Select2 / Chosen custom events if page uses them

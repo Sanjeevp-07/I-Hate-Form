@@ -71,13 +71,46 @@ const ALIAS_DICTIONARY: Record<string, string[]> = {
   f: ["female", "f", "woman", "women", "2"],
 
   // Salutations / Titles
-  "mr.": ["mr.", "mr", "mister", "shri", "dr.", "dr", "sir"],
-  "ms.": ["ms.", "ms", "miss", "mrs.", "mrs", "shrimati", "shree"],
+  "mr.": ["mr.", "mr", "mister", "shri", "sir", "mr. / shri", "mr / shri", "mr."],
+  mr: ["mr.", "mr", "mister", "shri", "sir", "mr. / shri", "mr / shri"],
+  "ms.": ["ms.", "ms", "miss", "miss.", "mrs.", "mrs", "shrimati", "shree"],
+  ms: ["ms.", "ms", "miss", "miss.", "mrs.", "mrs", "shrimati"],
+  miss: ["miss", "miss.", "ms.", "ms", "unmarried"],
   "mrs.": ["mrs.", "mrs", "ms.", "ms", "shrimati"],
   "dr.": ["dr.", "dr", "doctor"],
 
   // Dial / Country Codes
-  "+91": ["+91", "91", "india (+91)", "india(+91)", "(+91)", "+91 (india)", "india (91)"],
+  "+91": [
+    "+91",
+    "91",
+    "india (+91)",
+    "india(+91)",
+    "(+91)",
+    "+91 (india)",
+    "india (91)",
+    "ind_91",
+    "ind (+91)",
+    "india - (+91)",
+    "india - +91",
+    "india",
+    "+91 india",
+    "ind",
+    "in (+91)",
+  ],
+  "91": [
+    "+91",
+    "91",
+    "india (+91)",
+    "india(+91)",
+    "(+91)",
+    "+91 (india)",
+    "india (91)",
+    "ind_91",
+    "ind (+91)",
+    "india",
+    "ind",
+    "in (+91)",
+  ],
   "+1": ["+1", "1", "usa (+1)", "united states (+1)", "(+1)", "canada (+1)", "+1 (usa)"],
   "+44": ["+44", "44", "uk (+44)", "united kingdom (+44)", "(+44)"],
 
@@ -153,6 +186,39 @@ const ALIAS_DICTIONARY: Record<string, string[]> = {
   // Boolean / Yes / No
   yes: ["yes", "y", "true", "1", "authorized", "eligible", "agreed"],
   no: ["no", "n", "false", "0", "not authorized", "not eligible", "disagree"],
+
+  // Months & Experience numbers & Notice Periods
+  "0": ["0", "0 months", "0 month", "0 mos", "0 yr", "0 yrs", "0 years", "fresher", "none", "zero", "0 - 1 month", "0 to 1 month", "less than 1 month", "0 (fresher)"],
+  "0 months": ["0", "0 months", "0 month", "0 mos", "none", "zero", "fresher", "less than 1 month"],
+  "1": ["1", "1 month", "1 months", "1 mo", "1 mos", "1 yr", "1 year", "1 years", "one", "30 days", "30"],
+  "1 month": ["1", "1 month", "1 months", "1 mo", "1 mos", "30 days", "30"],
+  "1 months": ["1", "1 month", "1 months", "1 mo", "1 mos", "30 days", "30"],
+  "2": ["2", "2 months", "2 mo", "2 mos", "2 yrs", "2 years", "two", "60 days", "60"],
+  "2 months": ["2", "2 months", "2 mo", "2 mos", "60 days", "60"],
+  "3": ["3", "3 months", "3 mo", "3 mos", "3 yrs", "3 years", "three", "90 days", "90"],
+  "3 months": ["3", "3 months", "3 mo", "3 mos", "90 days", "90"],
+  "4": ["4", "4 months", "4 mo", "4 mos", "four"],
+  "4 months": ["4", "4 months", "4 mo", "4 mos"],
+  "5": ["5", "5 months", "5 mo", "5 mos", "five"],
+  "5 months": ["5", "5 months", "5 mo", "5 mos"],
+  "6": ["6", "6 months", "6 mo", "6 mos", "half year", "6m", "six"],
+  "6 months": ["6", "6 months", "6 mo", "6 mos"],
+  "7": ["7", "7 months", "7 mo", "7 mos", "seven"],
+  "7 months": ["7", "7 months", "7 mo", "7 mos"],
+  "8": ["8", "8 months", "8 mo", "8 mos", "eight"],
+  "8 months": ["8", "8 months", "8 mo", "8 mos"],
+  "9": ["9", "9 months", "9 mo", "9 mos", "nine"],
+  "9 months": ["9", "9 months", "9 mo", "9 mos"],
+  "10": ["10", "10 months", "10 mo", "10 mos", "ten"],
+  "10 months": ["10", "10 months", "10 mo", "10 mos"],
+  "11": ["11", "11 months", "11 mo", "11 mos", "eleven"],
+  "11 months": ["11", "11 months", "11 mo", "11 mos"],
+  "12": ["12", "12 months", "1 year", "1 yr", "12 mos", "twelve"],
+
+  // Notice Period
+  immediate: ["immediate", "immediate joiner", "immediate joining", "0 days", "0 days / immediate", "0-15 days", "15 days or less", "available immediately", "ready to join immediately"],
+  "immediate joiner": ["immediate", "immediate joiner", "immediate joining", "0 days", "0 days / immediate", "0-15 days", "15 days or less", "available immediately", "ready to join immediately"],
+  "15 days": ["15 days", "15 days or less", "0-15 days", "immediate", "15"],
 };
 
 /**
@@ -230,6 +296,8 @@ export function findBestOptionMatch(
 
   // Retrieve alias list for the target if available
   const aliases = ALIAS_DICTIONARY[cleanTarget] || [];
+  const targetNumMatch = cleanTarget.match(/\b\d+(\.\d+)?\b/);
+  const targetNum = targetNumMatch ? targetNumMatch[0] : null;
 
   let bestMatch: OptionMatchResult | null = null;
   let highestScore = -1;
@@ -261,46 +329,60 @@ export function findBestOptionMatch(
     if (cleanOptVal === cleanTarget || cleanOptText === cleanTarget) {
       score = 100;
     }
-    // 2. Direct match against known aliases/synonyms
-    else if (aliases.includes(cleanOptVal) || aliases.includes(cleanOptText)) {
-      score = 95;
+    // 2. Numeric match (e.g. target "0" and option "0 months" or value "0")
+    else if (targetNum !== null) {
+      const optTextNumMatch = cleanOptText.match(/\b\d+(\.\d+)?\b/);
+      const optValNumMatch = cleanOptVal.match(/\b\d+(\.\d+)?\b/);
+      if (
+        (optTextNumMatch && optTextNumMatch[0] === targetNum) ||
+        (optValNumMatch && optValNumMatch[0] === targetNum)
+      ) {
+        score = 98;
+      }
     }
-    // 3. Reverse alias search (e.g. cleanOptText matches alias key whose list includes target)
-    else if (
-      ALIAS_DICTIONARY[cleanOptText]?.includes(cleanTarget) ||
-      ALIAS_DICTIONARY[cleanOptVal]?.includes(cleanTarget)
-    ) {
-      score = 94;
-    }
-    // 4. Whole word boundary match in Text (e.g. "India (+91)" matches "India" or "+91")
-    else if (
-      new RegExp(`(^|\\b|\\()${cleanTarget.replace(/[+.*^$?(){}|[\]\\]/g, "\\$&")}(\\b|\\)|$)`, "i").test(cleanOptText) ||
-      new RegExp(`(^|\\b|\\()${cleanTarget.replace(/[+.*^$?(){}|[\]\\]/g, "\\$&")}(\\b|\\)|$)`, "i").test(cleanOptVal)
-    ) {
-      score = 90;
-    }
-    // 5. Text starts with target or target starts with text
-    else if (
-      cleanOptText.startsWith(cleanTarget) ||
-      cleanTarget.startsWith(cleanOptText)
-    ) {
-      score = 85;
-    }
-    // 6. Substring containment
-    else if (
-      cleanOptText.includes(cleanTarget) ||
-      (cleanOptVal && cleanOptVal.includes(cleanTarget))
-    ) {
-      score = 75;
-    }
-    // 7. Fuzzy bigram string similarity
-    else {
-      const similarity = Math.max(
-        calculateSimilarity(cleanOptText, cleanTarget),
-        calculateSimilarity(cleanOptVal, cleanTarget)
-      );
-      if (similarity >= 0.7) {
-        score = Math.round(similarity * 70);
+    
+    if (score < 98) {
+      // 3. Direct match against known aliases/synonyms
+      if (aliases.includes(cleanOptVal) || aliases.includes(cleanOptText)) {
+        score = 95;
+      }
+      // 4. Reverse alias search
+      else if (
+        ALIAS_DICTIONARY[cleanOptText]?.includes(cleanTarget) ||
+        ALIAS_DICTIONARY[cleanOptVal]?.includes(cleanTarget)
+      ) {
+        score = 94;
+      }
+      // 5. Whole word boundary match in Text
+      else if (
+        new RegExp(`(^|\\b|\\()${cleanTarget.replace(/[+.*^$?(){}|[\]\\]/g, "\\$&")}(\\b|\\)|$)`, "i").test(cleanOptText) ||
+        new RegExp(`(^|\\b|\\()${cleanTarget.replace(/[+.*^$?(){}|[\]\\]/g, "\\$&")}(\\b|\\)|$)`, "i").test(cleanOptVal)
+      ) {
+        score = 90;
+      }
+      // 6. Text starts with target or target starts with text
+      else if (
+        cleanOptText.startsWith(cleanTarget) ||
+        cleanTarget.startsWith(cleanOptText)
+      ) {
+        score = 85;
+      }
+      // 7. Substring containment
+      else if (
+        cleanOptText.includes(cleanTarget) ||
+        (cleanOptVal && cleanOptVal.includes(cleanTarget))
+      ) {
+        score = 75;
+      }
+      // 8. Fuzzy bigram string similarity
+      else {
+        const similarity = Math.max(
+          calculateSimilarity(cleanOptText, cleanTarget),
+          calculateSimilarity(cleanOptVal, cleanTarget)
+        );
+        if (similarity >= 0.7) {
+          score = Math.round(similarity * 70);
+        }
       }
     }
 
