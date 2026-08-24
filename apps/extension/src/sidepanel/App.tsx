@@ -24,6 +24,7 @@ export const App: React.FC = () => {
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [isFilling, setIsFilling] = useState<boolean>(false);
   const [closedRootsCount, setClosedRootsCount] = useState<number>(0);
+  const [hasResumeField, setHasResumeField] = useState<boolean>(false);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [fillSummary, setFillSummary] = useState<{ filled: number; skipped: number; resumeUploaded?: boolean; resumeName?: string } | null>(null);
 
@@ -162,6 +163,8 @@ export const App: React.FC = () => {
     }
   };
 
+  const [isGeneratingAI, setIsGeneratingAI] = useState<boolean>(false);
+
   const handleOptionOverride = (fieldIndex: number, newValue: string) => {
     setMappings((prev) => {
       const updated = [...prev];
@@ -170,10 +173,88 @@ export const App: React.FC = () => {
           ...updated[fieldIndex],
           valueToFill: newValue,
           action: "fill",
+          confidence: Math.max(updated[fieldIndex].confidence, 0.95),
         };
       }
       return updated;
     });
+  };
+
+  const handleValueChange = (fieldIndex: number, newValue: string) => {
+    setMappings((prev) => {
+      const updated = [...prev];
+      if (updated[fieldIndex]) {
+        updated[fieldIndex] = {
+          ...updated[fieldIndex],
+          valueToFill: newValue,
+          action: newValue.trim() ? "fill" : "review",
+          confidence: newValue.trim() ? 0.95 : 0.5,
+          source: "user_override",
+        };
+      }
+      return updated;
+    });
+  };
+
+  const handleGenerateAIAnswers = async (targetFields?: FieldDescriptor[], baseMappings?: FieldMapping[]) => {
+    const fieldsToProcess = targetFields || fields;
+    const existingMappings = baseMappings || mappings;
+
+    if (!fieldsToProcess || fieldsToProcess.length === 0) return;
+
+    setIsGeneratingAI(true);
+    try {
+      // Filter fields that do not have deterministic static values
+      const unmappedFields = fieldsToProcess.filter((_, idx) => {
+        const m = existingMappings[idx];
+        return !m || m.valueToFill === null || m.valueToFill === undefined || m.valueToFill === "" || m.action === "unsupported" || m.action === "review";
+      });
+
+      if (unmappedFields.length === 0) {
+        setIsGeneratingAI(false);
+        return;
+      }
+
+      const res = await fetch(`${BACKEND_BASE_URL}/api/autofill/generate-answers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          fields: unmappedFields,
+          profile: userProfile,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const aiMappings: FieldMapping[] = data.mappings || [];
+
+        const mergedMappings = fieldsToProcess.map((f, idx) => {
+          const current = existingMappings[idx];
+          const aiMatch = aiMappings.find((aim) => aim.fieldId === f.id);
+
+          if (aiMatch && aiMatch.valueToFill !== null && aiMatch.valueToFill !== undefined) {
+            return {
+              ...current,
+              ...aiMatch,
+              action: "fill" as const,
+              source: "ai_strong" as const,
+            };
+          }
+          return current;
+        });
+
+        setMappings(mergedMappings);
+        await setSessionState({
+          detectedFields: fieldsToProcess,
+          currentMappings: mergedMappings,
+        });
+      }
+    } catch (err) {
+      console.warn("AI generation failed or offline:", err);
+    } finally {
+      setIsGeneratingAI(false);
+    }
   };
 
   const handleScanForm = async () => {
@@ -200,14 +281,17 @@ export const App: React.FC = () => {
                 const detected: FieldDescriptor[] = response.fields;
                 setFields(detected);
                 setClosedRootsCount(response.closedShadowRootsDetected || 0);
+                setHasResumeField(Boolean(response.hasResumeField));
 
-                // Map fields deterministically and populate real user values
-                const initialMappings = detected.map((f) => {
+                // 1. Map fields deterministically from user profile
+                const initialMappings: FieldMapping[] = detected.map((f) => {
                   const m = mapFieldDeterministically(f, null);
                   const realVal = resolveProfileValue(m.profilePath);
                   return {
                     ...m,
                     valueToFill: realVal,
+                    action: realVal ? "fill" : m.action,
+                    confidence: realVal ? 0.98 : m.confidence,
                   };
                 });
 
@@ -217,8 +301,14 @@ export const App: React.FC = () => {
                   detectedFields: detected,
                   currentMappings: initialMappings,
                 });
+
+                setIsScanning(false);
+
+                // 2. Automatically generate NVIDIA NIM AI answers for remaining fields (experience, CTC, notice period, essays, etc.)
+                handleGenerateAIAnswers(detected, initialMappings);
+              } else {
+                setIsScanning(false);
               }
-              setIsScanning(false);
             }
           );
         } else {
@@ -236,7 +326,7 @@ export const App: React.FC = () => {
     setIsFilling(true);
     setErrors([]);
 
-    // Update mappings with latest profile values before autofilling
+    // Update mappings with latest profile values or AI answers before autofilling
     const enrichedMappings = mappings.map((m) => {
       const profileVal = resolveProfileValue(m.profilePath);
       const targetVal = m.valueToFill !== undefined && m.valueToFill !== null ? m.valueToFill : profileVal;
@@ -356,20 +446,22 @@ export const App: React.FC = () => {
   }
 
   const highConfidenceCount = mappings.filter(
-    (m) => m.confidence >= CONFIDENCE_THRESHOLDS.AUTO_FILL
+    (m) => (m.valueToFill !== null && m.valueToFill !== undefined && m.valueToFill !== "") && (m.confidence >= CONFIDENCE_THRESHOLDS.AUTO_FILL_REVIEW || m.action === "fill")
   ).length;
   const reviewCount = mappings.filter(
     (m) =>
-      m.confidence >= CONFIDENCE_THRESHOLDS.AUTO_FILL_REVIEW &&
-      m.confidence < CONFIDENCE_THRESHOLDS.AUTO_FILL
+      (!m.valueToFill || m.action === "review") &&
+      m.confidence >= CONFIDENCE_THRESHOLDS.ASK_USER &&
+      m.confidence < CONFIDENCE_THRESHOLDS.AUTO_FILL_REVIEW
   ).length;
   const askCount = mappings.filter(
     (m) =>
+      (!m.valueToFill || m.action === "review") &&
       m.confidence >= CONFIDENCE_THRESHOLDS.ASK_USER &&
       m.confidence < CONFIDENCE_THRESHOLDS.AUTO_FILL_REVIEW
   ).length;
   const unsupportedCount = mappings.filter(
-    (m) => m.confidence < CONFIDENCE_THRESHOLDS.ASK_USER
+    (m) => (m.valueToFill === null || m.valueToFill === undefined || m.valueToFill === "") && m.confidence < CONFIDENCE_THRESHOLDS.ASK_USER
   ).length;
 
   const iframeFieldsCount = fields.filter((f) => f.frameId > 0).length;
@@ -420,6 +512,18 @@ export const App: React.FC = () => {
         </button>
       </div>
 
+      {/* Dedicated NVIDIA NIM AI Answer Generation Button */}
+      {fields.length > 0 && (
+        <button
+          onClick={() => handleGenerateAIAnswers()}
+          disabled={isGeneratingAI}
+          className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 bg-gradient-to-r from-violet-700 via-indigo-600 to-cyan-600 hover:from-violet-600 hover:to-cyan-500 active:scale-98 transition text-white rounded-lg text-xs font-semibold shadow-md shadow-indigo-950/50 border border-indigo-400/30 disabled:opacity-50 cursor-pointer"
+        >
+          <Sparkles className={`w-3.5 h-3.5 ${isGeneratingAI ? "animate-spin text-amber-300" : "text-amber-300 fill-amber-300"}`} />
+          <span>{isGeneratingAI ? "NVIDIA NIM Generating Answers..." : "✨ Auto-Generate with NVIDIA AI"}</span>
+        </button>
+      )}
+
       {/* Frame & Shadow DOM Badges */}
       {fields.length > 0 && (
         <div className="mt-2.5 flex items-center gap-1.5 flex-wrap text-[11px]">
@@ -460,20 +564,22 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Resume PDF Auto-Upload Indicator */}
-      <div className="mt-2.5 p-2 bg-indigo-950/40 border border-indigo-800/40 rounded-lg text-xs flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-indigo-300 font-medium truncate">
-          <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-          <span className="truncate">
-            {userProfile?.personal
-              ? `${userProfile.personal.firstName}_${userProfile.personal.lastName}_Resume.pdf`
-              : "Sanjeev_Kumar_Resume.pdf"}
+      {/* Resume PDF Auto-Upload Indicator (Only rendered when resume upload field is present on form) */}
+      {hasResumeField && (
+        <div className="mt-2.5 p-2 bg-indigo-950/40 border border-indigo-800/40 rounded-lg text-xs flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-indigo-300 font-medium truncate">
+            <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <span className="truncate">
+              {userProfile?.personal
+                ? `${userProfile.personal.firstName}_${userProfile.personal.lastName}_Resume.pdf`
+                : "Sanjeev_Kumar_Resume.pdf"}
+            </span>
+          </div>
+          <span className="text-[10px] px-1.5 py-0.5 bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 rounded font-medium shrink-0">
+            Uploads 1st
           </span>
         </div>
-        <span className="text-[10px] px-1.5 py-0.5 bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 rounded font-medium shrink-0">
-          Uploads 1st
-        </span>
-      </div>
+      )}
 
       {/* Fill Summary Alert */}
       {fillSummary && (
@@ -528,7 +634,10 @@ export const App: React.FC = () => {
             {fields.map((field, idx) => {
               const mapping = mappings[idx];
               const confidence = mapping ? mapping.confidence : 0;
-              const valueToFill = mapping?.valueToFill || resolveProfileValue(mapping?.profilePath);
+              const valueToFill = mapping?.valueToFill !== undefined && mapping?.valueToFill !== null
+                ? mapping.valueToFill
+                : resolveProfileValue(mapping?.profilePath);
+              const isAIMapped = mapping?.source?.includes("ai");
 
               return (
                 <div
@@ -536,16 +645,21 @@ export const App: React.FC = () => {
                   className="p-2.5 bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs transition"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="font-medium text-slate-200 truncate flex-1">
-                      {field.rawLabel || field.name || "Unnamed field"}
+                    <div className="font-medium text-slate-200 truncate flex-1 flex items-center gap-1.5">
+                      <span>{field.rawLabel || field.name || "Unnamed field"}</span>
+                      {isAIMapped && (
+                        <span className="text-[9px] px-1 py-0.2 bg-violet-950/80 text-violet-300 border border-violet-700/50 rounded font-semibold uppercase tracking-wider">
+                          NVIDIA NIM
+                        </span>
+                      )}
                     </div>
                     <span
                       className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-medium ${
-                        confidence >= 0.95
+                        confidence >= 0.9
                           ? "bg-emerald-950/60 text-emerald-400 border border-emerald-800/40"
-                          : confidence >= 0.8
+                          : confidence >= 0.7
                           ? "bg-amber-950/60 text-amber-400 border border-amber-800/40"
-                          : confidence >= 0.5
+                          : confidence >= 0.4
                           ? "bg-blue-950/60 text-blue-400 border border-blue-800/40"
                           : "bg-rose-950/60 text-rose-400 border border-rose-800/40"
                       }`}
@@ -554,19 +668,20 @@ export const App: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="mt-1 flex items-center justify-between text-[11px] gap-2">
-                    <span className="text-slate-400 truncate flex-1">
-                      {valueToFill ? (
-                        <span className="text-emerald-400 font-mono font-medium">"{valueToFill}"</span>
-                      ) : (
-                        <span className="text-slate-600 italic">No saved value</span>
-                      )}
-                    </span>
-                    <span className="capitalize text-[10px] text-slate-500 shrink-0">
-                      {field.type}
-                    </span>
-                  </div>
+                  {/* Text / Number Input Editable Field */}
+                  {field.type !== "select" && (
+                    <div className="mt-1.5">
+                      <input
+                        type="text"
+                        className="w-full bg-slate-950/90 text-emerald-300 border border-slate-700/70 rounded px-2 py-1 text-[11px] font-mono focus:border-indigo-500 focus:outline-none"
+                        placeholder="No saved value"
+                        value={valueToFill !== null && valueToFill !== undefined ? String(valueToFill) : ""}
+                        onChange={(e) => handleValueChange(idx, e.target.value)}
+                      />
+                    </div>
+                  )}
 
+                  {/* Dropdown Options Selector */}
                   {field.type === "select" && field.options && field.options.length > 0 && (
                     <div className="mt-2 pt-1.5 border-t border-slate-800/60">
                       <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
@@ -607,3 +722,4 @@ export const App: React.FC = () => {
     </div>
   );
 };
+

@@ -1,5 +1,6 @@
 import { scanFormFieldsWithStats } from "./dom-scanner";
 import { executeAutofill } from "./autofill-engine";
+import { findResumeUploadInputs } from "./resume-uploader";
 import { FrameRegistry } from "./frame-registry";
 import { FormMutationWatcher } from "./mutation-observer";
 import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPayload } from "../types";
@@ -20,10 +21,12 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
     if (message.type === "SCAN_FORM") {
       try {
         const scanStats = scanFormFieldsWithStats();
-        const payload: ScanResultPayload & { closedShadowRootsDetected?: number } = {
+        const resumeInputs = findResumeUploadInputs();
+        const payload: ScanResultPayload & { closedShadowRootsDetected?: number; hasResumeField?: boolean } = {
           frameId: currentFrameId,
           fields: scanStats.fields,
           closedShadowRootsDetected: scanStats.closedShadowRootsDetected,
+          hasResumeField: resumeInputs.length > 0,
         };
         sendResponse(payload);
       } catch (err) {

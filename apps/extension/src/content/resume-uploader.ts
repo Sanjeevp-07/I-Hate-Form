@@ -132,27 +132,62 @@ startxref
 }
 
 /**
- * Searches the DOM and all accessible shadow roots for Resume / PDF file upload elements.
+/**
+ * Checks if an element is currently rendered and visible (not display:none, visibility:hidden, or inside hidden wizard tabs).
+ */
+export function isElementVisible(element: HTMLElement): boolean {
+  // Check inline or ancestor hidden styles/attributes
+  if (element.closest('[style*="display: none"], [style*="display:none"], [hidden], .hidden, [aria-hidden="true"]')) {
+    return false;
+  }
+
+  if (typeof window !== "undefined" && typeof window.getComputedStyle === "function") {
+    let current: HTMLElement | null = element;
+    while (current && current !== document.body) {
+      const style = window.getComputedStyle(current);
+      if (style.display === "none" || style.visibility === "hidden") {
+        return false;
+      }
+      if (style.opacity === "0" && current !== element) {
+        return false;
+      }
+      current = current.parentElement;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Searches the DOM and all accessible shadow roots for visible Resume / CV file upload elements.
  */
 export function findResumeUploadInputs(): HTMLInputElement[] {
   const allFileInputs = querySelectorAllDeep('input[type="file"]') as HTMLInputElement[];
   const resumeInputs: HTMLInputElement[] = [];
 
-  const resumeKeywords = /resume|cv|curriculum|upload|document|attachment|pdf|file|apply|profile/i;
+  const resumeKeywords = /resume|cv\b|curriculum|biodata|profile[\s_-]?upload|attach[\s_-]?resume|upload[\s_-]?resume|upload[\s_-]?cv|upload[\s_-]?document/i;
 
   for (const input of allFileInputs) {
+    if (!isElementVisible(input)) {
+      continue;
+    }
+
     const name = input.getAttribute("name") || "";
     const id = input.getAttribute("id") || "";
     const accept = (input.getAttribute("accept") || "").toLowerCase();
     const ariaLabel = input.getAttribute("aria-label") || "";
-    const parentText = input.parentElement?.textContent || "";
+    const parentText = (input.parentElement?.textContent || "").slice(0, 150);
+    const label = input.closest("label") || (input.id ? document.querySelector(`label[for="${input.id}"]`) : null);
+    const labelText = (label?.textContent || "").slice(0, 150);
     const dataAutomation = input.getAttribute("data-automation-id") || "";
 
-    const isPdfAccept = accept.includes("pdf") || accept.includes("doc") || accept.includes("*") || accept === "";
-    const textBlob = `${name} ${id} ${ariaLabel} ${parentText.slice(0, 150)} ${dataAutomation}`.toLowerCase();
+    const textBlob = `${name} ${id} ${ariaLabel} ${labelText} ${parentText} ${dataAutomation}`.toLowerCase();
 
-    // If there's only 1 file input on page, or it matches keywords/accepts pdf
-    if (isPdfAccept || resumeKeywords.test(textBlob) || allFileInputs.length === 1) {
+    const isPdfAccept = accept.includes("pdf") || accept.includes("doc") || accept.includes("docx");
+    const matchesResumeKeyword = resumeKeywords.test(textBlob);
+
+    // Only consider it a resume input if it explicitly accepts PDF/DOC documents OR its label/surrounding context matches resume/cv keywords
+    if (matchesResumeKeyword || isPdfAccept) {
       resumeInputs.push(input);
     }
   }

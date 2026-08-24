@@ -103,6 +103,55 @@ describe("Phase 6: Country Mapping, Dropdown Autofill & Resume PDF Auto-Upload",
     expect(input.files?.[0].type).toBe("application/pdf");
   });
 
+  it("Does NOT upload resume when no file input is present on the page", () => {
+    document.body.innerHTML = `
+      <form id="step-2-form">
+        <label for="experience">Total Experience</label>
+        <input type="text" id="experience" name="experience" />
+      </form>
+    `;
+
+    const result = autoUploadResume(mockProfile);
+
+    expect(result.detected).toBe(false);
+    expect(result.uploaded).toBe(false);
+    expect(result.elementCount).toBe(0);
+  });
+
+  it("Does NOT upload resume when file input is in a hidden wizard step (display: none)", () => {
+    document.body.innerHTML = `
+      <div id="wizard-step-1" style="display: none;">
+        <label for="resume-step1">Upload Resume</label>
+        <input type="file" id="resume-step1" name="resume" accept=".pdf" />
+      </div>
+      <div id="wizard-step-2" style="display: block;">
+        <label for="experience">Total Experience</label>
+        <input type="text" id="experience" name="experience" />
+      </div>
+    `;
+
+    const result = autoUploadResume(mockProfile);
+
+    expect(result.detected).toBe(false);
+    expect(result.uploaded).toBe(false);
+    expect(result.elementCount).toBe(0);
+  });
+
+  it("Does NOT upload resume to generic non-document file inputs (e.g. photo avatar uploaders)", () => {
+    document.body.innerHTML = `
+      <form id="profile-pic-form">
+        <label for="avatar">Upload Profile Picture</label>
+        <input type="file" id="avatar" name="avatar_pic" accept="image/png,image/jpeg" />
+      </form>
+    `;
+
+    const result = autoUploadResume(mockProfile);
+
+    expect(result.detected).toBe(false);
+    expect(result.uploaded).toBe(false);
+    expect(result.elementCount).toBe(0);
+  });
+
   it("Autofills dependent dropdown (Country -> State) on the 1st autofill attempt without requiring a 2nd click", async () => {
     document.body.innerHTML = `
       <form id="app-form">
