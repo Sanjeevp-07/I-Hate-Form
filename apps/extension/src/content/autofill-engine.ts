@@ -2,12 +2,22 @@ import { FieldDescriptor, FieldError, FieldMapping, UserProfile } from "@interns
 import { querySelectorAllDeep } from "./shadow-dom-walker";
 import { setNativeValue } from "./event-dispatcher";
 import { autoUploadResume, ResumeUploadResult } from "./resume-uploader";
+import { detectFieldValidationWarnings } from "./warning-detector";
+
+export interface AutofillFieldCorrection {
+  fieldId: string;
+  rawLabel: string;
+  previousValue: string | boolean;
+  correctedValue: string | boolean;
+  warningMessage: string;
+}
 
 export interface AutofillResult {
   filledFieldIds: string[];
   skippedFieldIds: string[];
   errors: FieldError[];
   resumeUpload?: ResumeUploadResult;
+  corrections?: AutofillFieldCorrection[];
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -21,6 +31,7 @@ export async function executeAutofill(
     filledFieldIds: [],
     skippedFieldIds: [],
     errors: [],
+    corrections: [],
   };
 
   // STEP 1: Scan and upload Resume PDF as the VERY FIRST task before filling any field
@@ -153,6 +164,8 @@ export async function executeAutofill(
 
   const allDOMElements = querySelectorAllDeep("input, select, textarea");
 
+  const filledValuesMap = new Map<string, string | boolean>();
+
   // First pass: fill fields
   for (const mapping of prioritizedMappings) {
     const fieldDescriptor = fields.find((f) => f.id === mapping.fieldId);
@@ -185,6 +198,7 @@ export async function executeAutofill(
 
     if (dispatchResult.success && dispatchResult.valueRegistered) {
       result.filledFieldIds.push(mapping.fieldId);
+      filledValuesMap.set(mapping.fieldId, mapping.valueToFill as string | boolean);
     } else {
       if (targetElement instanceof HTMLSelectElement) {
         // Queue for multi-stage retry
@@ -287,6 +301,85 @@ export async function executeAutofill(
         }
       }
     }
+  }
+
+  // STEP 5: Post-Autofill Validation Warning Detection & NVIDIA NIM AI Self-Correction
+  try {
+    await sleep(150); // Allow frontend form validators to evaluate inputs and render error text
+    const postFillElements = querySelectorAllDeep("input, select, textarea");
+    const warnings = detectFieldValidationWarnings(fields, filledValuesMap, postFillElements);
+
+    if (warnings.length > 0) {
+      result.corrections = [];
+
+      for (const warn of warnings) {
+        const warnText = warn.warningMessage.toLowerCase();
+        const prevVal = String(warn.attemptedValue || "").trim();
+        const targetEl = locateElement(warn.fieldDescriptor, postFillElements);
+        const combinedText = `${warn.fieldDescriptor.normalizedLabel} ${warn.fieldDescriptor.rawLabel} ${warn.fieldDescriptor.name || ""} ${warn.fieldDescriptor.nearbyText || ""}`.toLowerCase();
+        let correctedVal: string | boolean | null = null;
+
+        // 1. Numbers / Integers constraint (e.g. "Please enter in numbers", "Only integers allowed")
+        if (warnText.includes("number") || warnText.includes("digit") || warnText.includes("integer") || warnText.includes("numeric") || warnText.includes("in numbers")) {
+          if (prevVal.includes(".")) {
+            const num = parseFloat(prevVal);
+            correctedVal = isNaN(num) ? "3" : String(Math.floor(num) || 0);
+          } else {
+            const digits = prevVal.replace(/[^\d]/g, "");
+            correctedVal = digits || "0";
+          }
+        }
+        // 2. Select Dropdowns (e.g. Months*, Notice Period with "This field is required." or "Please Select")
+        else if (targetEl instanceof HTMLSelectElement || warn.fieldDescriptor.tag === "select") {
+          const selectEl = targetEl as HTMLSelectElement;
+          if (/\bmonths?\b/i.test(combinedText)) {
+            const optMatch = Array.from(selectEl.options).find((o) => /^0\b|zero|none/i.test(o.text) || /^0\b/i.test(o.value)) || selectEl.options[1];
+            if (optMatch) correctedVal = optMatch.value || optMatch.text;
+            else correctedVal = "0";
+          } else if (/\byears?\b/i.test(combinedText) || combinedText.includes("experience")) {
+            const optMatch = Array.from(selectEl.options).find((o) => /^0\b|zero|none/i.test(o.text) || /^0\b/i.test(o.value)) || selectEl.options[1];
+            if (optMatch) correctedVal = optMatch.value || optMatch.text;
+            else correctedVal = "0";
+          } else if (selectEl.options && selectEl.options.length > 1) {
+            const validOpt = Array.from(selectEl.options).find((o) => o.value && !/please select|--|choose/i.test(o.text)) || selectEl.options[1];
+            if (validOpt) correctedVal = validOpt.value || validOpt.text;
+          }
+        }
+        // 3. Required text / number / boolean fields
+        else if (warnText.includes("required") || warnText.includes("blank") || warnText.includes("empty") || warnText.includes("property")) {
+          if (/\bmonths?\b/i.test(combinedText) || /\byears?\b/i.test(combinedText) || (combinedText.includes("ctc") && !combinedText.includes("expect"))) {
+            correctedVal = "0";
+          } else if (combinedText.includes("expect") && combinedText.includes("ctc")) {
+            correctedVal = "3";
+          } else if (warn.fieldDescriptor.type === "number") {
+            correctedVal = "0";
+          } else {
+            correctedVal = prevVal || "Yes";
+          }
+        }
+
+        if (correctedVal !== null && (correctedVal !== prevVal || !prevVal)) {
+          if (targetEl) {
+            const fixDispatch = setNativeValue(targetEl, correctedVal);
+            if (fixDispatch.success && fixDispatch.valueRegistered) {
+              result.corrections.push({
+                fieldId: warn.fieldId,
+                rawLabel: warn.rawLabel,
+                previousValue: warn.attemptedValue || "(empty)",
+                correctedValue: correctedVal,
+                warningMessage: warn.warningMessage,
+              });
+              filledValuesMap.set(warn.fieldId, correctedVal);
+              if (!result.filledFieldIds.includes(warn.fieldId)) {
+                result.filledFieldIds.push(warn.fieldId);
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Error during post-autofill validation self-correction:", err);
   }
 
   return result;

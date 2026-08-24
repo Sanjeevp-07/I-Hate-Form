@@ -56,9 +56,10 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
     const body = await req.json();
-    const { fields, profile: payloadProfile } = body as {
+    const { fields, profile: payloadProfile, fieldWarnings } = body as {
       fields: FieldDescriptor[];
       profile?: UserProfile;
+      fieldWarnings?: Array<{ fieldId: string; attemptedValue: string | boolean; warningMessage: string }>;
     };
 
     if (!fields || !Array.isArray(fields) || fields.length === 0) {
@@ -84,8 +85,8 @@ export async function POST(req: NextRequest) {
       }
     } catch {}
 
-    // Generate dynamic answers using NVIDIA NIM
-    const result = await generateDynamicFieldAnswers(fields, activeProfile);
+    // Generate dynamic answers using NVIDIA NIM (with optional validation error self-correction)
+    const result = await generateDynamicFieldAnswers(fields, activeProfile, fieldWarnings);
     const latencyMs = Date.now() - startTime;
 
     // Log telemetry

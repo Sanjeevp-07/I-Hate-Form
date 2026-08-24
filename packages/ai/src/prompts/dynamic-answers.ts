@@ -1,8 +1,15 @@
 import { FieldDescriptor, UserProfile } from "@internship-copilot/types";
 
+export interface DynamicFieldWarningParam {
+  fieldId: string;
+  attemptedValue: string | boolean;
+  warningMessage: string;
+}
+
 export function buildDynamicFieldAnswerPrompt(params: {
   fields: FieldDescriptor[];
   profile: UserProfile;
+  fieldWarnings?: DynamicFieldWarningParam[];
 }): { system: string; user: string } {
   const system = `You are an intelligent job application autofill assistant powered by NVIDIA NIM.
 Your task is to analyze unscored / custom form fields on job application forms and generate the best, most accurate, and professional values based on the candidate's genuine background.
@@ -12,13 +19,16 @@ CRITICAL GUIDELINES:
    - Check the applicant's education (current graduation year) and work experience.
    - If the applicant is a student or fresher (or has 0 full-time corporate experience), and the field asks for "Total Years of Work Experience", "Experience in Years", or "Months" with notes like "Freshers enter 0": return "0".
    - If asking for "Current CTC" or "Cost to Company" for freshers/students: return "0" or "0.0".
-   - If asking for "Expected CTC" for freshers/interns: return a reasonable entry like "3" or "3.5" (or "0" if internship stipend is unspecified) unless the profile indicates otherwise.
+   - If asking for "Expected CTC" for freshers/interns: return a clean numeric value like "3" or "3.5" (or "0" if internship stipend is unspecified). If the field validator enforces integers, return "3".
    - If asking for "Notice Period": For students/freshers, choose "Immediate", "0 days", or "15 days" matching the available select options.
 2. Select / Dropdown Fields:
    - When the field has options provided in <options>, you MUST select the exact option value or label that best matches the candidate's profile.
 3. Open-Ended Questions:
    - For essay, behavioral, or technical questions (e.g. "Why join us?", "Describe your experience with Python"): write a concise, compelling, professional response (1-3 sentences or 50-100 words) strictly based on the applicant's projects and skills.
-4. Output Format:
+4. Validation Error Self-Correction:
+   - If <validation_warnings> are provided, the previous attempted value failed the form's client-side validation.
+   - You MUST analyze the warning message (e.g. "Please enter in numbers", "Only integers allowed", "Must be numeric") and generate a corrected value that strictly complies (e.g., if attempted "3.5" gave "Please enter in numbers", correct to integer "3").
+5. Output Format:
    - Return ONLY raw valid JSON adhering to the specified schema:
    {
      "answers": [
@@ -58,6 +68,10 @@ CRITICAL GUIDELINES:
     required: f.required,
   }));
 
+  const warningsBlock = params.fieldWarnings && params.fieldWarnings.length > 0
+    ? `\n<validation_warnings>\n${JSON.stringify(params.fieldWarnings, null, 2)}\n</validation_warnings>\n`
+    : "";
+
   const user = `<applicant_profile>
 ${JSON.stringify(profileSummary, null, 2)}
 </applicant_profile>
@@ -65,8 +79,8 @@ ${JSON.stringify(profileSummary, null, 2)}
 <fields_to_fill>
 ${JSON.stringify(fieldsForPrompt, null, 2)}
 </fields_to_fill>
-
-Generate intelligent, tailored answers for each field based on the applicant's profile and form context. Return JSON.`;
+${warningsBlock}
+Generate intelligent, tailored answers for each field based on the applicant's profile and form context. If validation warnings are provided, correct the previous values to strictly comply with the form constraints. Return JSON.`;
 
   return { system, user };
 }

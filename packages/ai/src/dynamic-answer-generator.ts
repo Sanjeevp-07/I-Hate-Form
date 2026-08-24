@@ -28,11 +28,86 @@ export interface DynamicAnswersOutput {
   model: string;
 }
 
+import { DynamicFieldWarningParam } from "./prompts/dynamic-answers";
+
 /**
  * Intelligent contextual fallback when LLM is offline or unconfigured
  */
-function resolveContextualFallback(field: FieldDescriptor, profile: UserProfile): { value: string | boolean; reasoning: string } | null {
+function resolveContextualFallback(
+  field: FieldDescriptor,
+  profile: UserProfile,
+  warning?: { attemptedValue: string | boolean; warningMessage: string }
+): { value: string | boolean; reasoning: string } | null {
   const combinedText = `${field.normalizedLabel} ${field.rawLabel} ${field.name || ""} ${field.nearbyText || ""}`.toLowerCase();
+
+  // Handle post-autofill validation warnings for ANY field
+  if (warning) {
+    const warn = warning.warningMessage.toLowerCase();
+    const prev = String(warning.attemptedValue || "").trim();
+
+    // 1. Number / Integer constraint (e.g. "Please enter in numbers", "Only digits allowed")
+    if (warn.includes("number") || warn.includes("digit") || warn.includes("integer") || warn.includes("numeric") || warn.includes("in numbers")) {
+      if (prev.includes(".")) {
+        const num = parseFloat(prev);
+        const corrected = isNaN(num) ? "3" : String(Math.floor(num) || 0);
+        return {
+          value: corrected,
+          reasoning: `Auto-corrected decimal '${prev}' to integer '${corrected}' per form validation '${warning.warningMessage}'`,
+        };
+      }
+      const digitsOnly = prev.replace(/[^\d]/g, "");
+      if (digitsOnly) {
+        return {
+          value: digitsOnly,
+          reasoning: `Auto-corrected to numeric '${digitsOnly}' per form validation`,
+        };
+      }
+      return {
+        value: "0",
+        reasoning: "Provided default numeric integer 0 per validation warning",
+      };
+    }
+
+    // 2. Required field missing / unselected (e.g. "This field is required.", "Is a required property")
+    if (warn.includes("required") || warn.includes("blank") || warn.includes("empty") || warn.includes("select")) {
+      // Months dropdown
+      if (/\bmonths?\b/i.test(combinedText)) {
+        if (field.options && field.options.length > 0) {
+          const matchOpt = field.options.find((o) => /^0\b|zero|none/i.test(o.label) || /^0\b/i.test(o.value)) || field.options[1];
+          if (matchOpt) return { value: matchOpt.value || matchOpt.label, reasoning: "Selected 0 months option for required fresher field" };
+        }
+        return { value: "0", reasoning: "Supplied 0 months for required fresher field" };
+      }
+
+      // Years
+      if (/\byears?\b/i.test(combinedText) || combinedText.includes("experience")) {
+        return { value: "0", reasoning: "Supplied 0 years for required fresher experience field" };
+      }
+
+      // CTC
+      if (/ctc|salary|cost[\s_-]?to[\s_-]?company/i.test(combinedText)) {
+        if (/expected|target/i.test(combinedText)) {
+          return { value: "3", reasoning: "Supplied standard expected CTC 3 Lakhs" };
+        }
+        return { value: "0", reasoning: "Supplied 0 for required current CTC" };
+      }
+
+      // Notice Period
+      if (/notice|availability/i.test(combinedText)) {
+        if (field.options && field.options.length > 0) {
+          const immOpt = field.options.find((o) => /immediate|0[\s_-]?days?|15[\s_-]?days?|<[\s_-]?1[\s_-]?month/i.test(o.label)) || field.options[1];
+          if (immOpt) return { value: immOpt.value || immOpt.label, reasoning: "Selected Immediate joining option for required field" };
+        }
+        return { value: "Immediate", reasoning: "Supplied Immediate notice period for required field" };
+      }
+
+      // Select dropdown fallback
+      if (field.options && field.options.length > 0) {
+        const validOpt = field.options.find((o) => o.value && !/please select|--|choose/i.test(o.label)) || field.options[1];
+        if (validOpt) return { value: validOpt.value || validOpt.label, reasoning: `Selected option '${validOpt.label}' for required dropdown` };
+      }
+    }
+  }
 
   // 1. Work Experience Years
   if (/\byears?\b/i.test(combinedText) || (combinedText.includes("experience") && !combinedText.includes("month"))) {
@@ -109,7 +184,8 @@ function resolveContextualFallback(field: FieldDescriptor, profile: UserProfile)
  */
 export async function generateDynamicFieldAnswers(
   fields: FieldDescriptor[],
-  profile: UserProfile
+  profile: UserProfile,
+  fieldWarnings?: DynamicFieldWarningParam[]
 ): Promise<DynamicAnswersOutput> {
   if (!fields || fields.length === 0) {
     return { mappings: [], tokens: { input: 0, output: 0 }, model: "none" };
@@ -118,6 +194,7 @@ export async function generateDynamicFieldAnswers(
   const { system, user } = buildDynamicFieldAnswerPrompt({
     fields,
     profile,
+    fieldWarnings,
   });
 
   try {
@@ -172,7 +249,8 @@ export async function generateDynamicFieldAnswers(
         });
       } else {
         // Fallback to contextual heuristic
-        const fallback = resolveContextualFallback(field, profile);
+        const matchingWarning = fieldWarnings?.find((w) => w.fieldId === field.id);
+        const fallback = resolveContextualFallback(field, profile, matchingWarning);
         if (fallback) {
           mappings.push({
             fieldId: field.id,
@@ -209,7 +287,8 @@ export async function generateDynamicFieldAnswers(
   } catch (err) {
     // Graceful fallback to contextual heuristics if API key is invalid or offline
     const fallbackMappings: FieldMapping[] = fields.map((field) => {
-      const fallback = resolveContextualFallback(field, profile);
+      const matchingWarning = fieldWarnings?.find((w) => w.fieldId === field.id);
+      const fallback = resolveContextualFallback(field, profile, matchingWarning);
       if (fallback) {
         return {
           fieldId: field.id,

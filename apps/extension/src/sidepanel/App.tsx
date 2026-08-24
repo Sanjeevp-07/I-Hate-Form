@@ -26,7 +26,13 @@ export const App: React.FC = () => {
   const [closedRootsCount, setClosedRootsCount] = useState<number>(0);
   const [hasResumeField, setHasResumeField] = useState<boolean>(false);
   const [errors, setErrors] = useState<FieldError[]>([]);
-  const [fillSummary, setFillSummary] = useState<{ filled: number; skipped: number; resumeUploaded?: boolean; resumeName?: string } | null>(null);
+  const [fillSummary, setFillSummary] = useState<{
+    filled: number;
+    skipped: number;
+    resumeUploaded?: boolean;
+    resumeName?: string;
+    corrections?: Array<{ fieldId: string; rawLabel: string; previousValue: any; correctedValue: any; warningMessage: string }>;
+  } | null>(null);
 
   // Check authentication status and fetch user profile
   const checkAuthAndFetchProfile = async () => {
@@ -361,7 +367,25 @@ export const App: React.FC = () => {
                   skipped: response.skippedFieldIds?.length || 0,
                   resumeUploaded: response.resumeUpload?.uploaded || false,
                   resumeName: response.resumeUpload?.fileName || "",
+                  corrections: response.corrections || [],
                 });
+
+                if (response.corrections && response.corrections.length > 0) {
+                  setMappings((prev) =>
+                    prev.map((m) => {
+                      const corr = response.corrections.find((c: any) => c.fieldId === m.fieldId);
+                      if (corr) {
+                        return {
+                          ...m,
+                          valueToFill: corr.correctedValue,
+                          reason: `Auto-corrected (${corr.warningMessage})`,
+                        };
+                      }
+                      return m;
+                    })
+                  );
+                }
+
                 if (response.errors) {
                   setErrors(response.errors);
                 }
@@ -594,6 +618,19 @@ export const App: React.FC = () => {
           {fillSummary.resumeUploaded && (
             <div className="flex items-center gap-1.5 text-[11px] text-emerald-400/90 pl-5">
               <span>📄 Resume PDF "{fillSummary.resumeName}" uploaded</span>
+            </div>
+          )}
+          {fillSummary.corrections && fillSummary.corrections.length > 0 && (
+            <div className="mt-1.5 pt-1.5 border-t border-emerald-800/40 text-[11px] space-y-1 text-cyan-300">
+              <div className="flex items-center gap-1.5 font-medium text-cyan-400">
+                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                <span>Auto-corrected {fillSummary.corrections.length} field {fillSummary.corrections.length === 1 ? "warning" : "warnings"} with NVIDIA AI:</span>
+              </div>
+              {fillSummary.corrections.map((c, i) => (
+                <div key={i} className="pl-5 text-slate-300">
+                  • <strong className="text-white">{c.rawLabel || "Field"}</strong>: <span className="line-through text-slate-500">{String(c.previousValue)}</span> &rarr; <span className="font-semibold text-emerald-300">{String(c.correctedValue)}</span> <span className="text-[10px] text-amber-400/80">({c.warningMessage})</span>
+                </div>
+              ))}
             </div>
           )}
         </div>

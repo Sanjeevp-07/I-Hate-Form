@@ -42,11 +42,12 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
           const scanStats = scanFormFieldsWithStats();
           const autofillResult = await executeAutofill(scanStats.fields, payload.mappings, payload.profile || null);
 
-          const resultPayload: FillResultPayload & { resumeUpload?: any } = {
+          const resultPayload: FillResultPayload & { resumeUpload?: any; corrections?: any } = {
             filledFieldIds: autofillResult.filledFieldIds,
             skippedFieldIds: autofillResult.skippedFieldIds,
             errors: autofillResult.errors,
             resumeUpload: autofillResult.resumeUpload,
+            corrections: autofillResult.corrections,
           };
           sendResponse(resultPayload);
         } catch (err) {
