@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { FieldDescriptor, FieldError, FieldMapping } from "@internship-copilot/types";
 import { CONFIDENCE_THRESHOLDS } from "@internship-copilot/config";
-import { mapFieldDeterministically } from "../content/field-mapper";
+import { mapFieldDeterministically, verifyAndCorrectFieldAnswers } from "../content/field-mapper";
 import { getSessionState, setSessionState } from "../storage/chrome-storage";
 import { Shield, Play, RefreshCw, Sparkles, Lock, Layers, AlertCircle, CheckCircle2, LogIn, ChevronDown, FileText, Upload, Scan } from "lucide-react";
 
@@ -163,6 +163,8 @@ export const App: React.FC = () => {
         return personal.nationality || "Indian";
       case "personal.dob":
         return personal.dob || null;
+      case "personal.location":
+        return [personal.city || "Greater Noida", personal.state || "Uttar Pradesh", personal.country || "India"].filter(Boolean).join(", ");
       case "personal.country":
         return personal.country || "India";
       case "personal.state":
@@ -212,11 +214,9 @@ export const App: React.FC = () => {
       case "higherSecondary.stream":
         return (userProfile as any)?.higherSecondary?.stream || "Science (PCM)";
       case "skills":
-        if (Array.isArray((userProfile as any)?.skills)) {
-          return (userProfile as any).skills.join(", ");
-        }
-        if (Array.isArray((userProfile as any)?.skillsList)) {
-          return (userProfile as any).skillsList.join(", ");
+        const rawSkills = (userProfile as any)?.skills || (userProfile as any)?.skillsList || [];
+        if (Array.isArray(rawSkills) && rawSkills.length > 0) {
+          return rawSkills.map((s: any) => (typeof s === "string" ? s : s?.name || "")).filter(Boolean).join(", ");
         }
         return "React, TypeScript, Next.js, Python, Node.js, Tailwind CSS, Docker, PostgreSQL";
       case "work.experienceYears":
@@ -370,10 +370,24 @@ export const App: React.FC = () => {
           return current;
         });
 
-        setMappings(mergedMappings);
+        const combinedAnswerMap: Record<string, string | boolean | string[]> = {};
+        for (const m of mergedMappings) {
+          if (m.valueToFill !== null && m.valueToFill !== undefined) {
+            combinedAnswerMap[m.fieldId] = m.valueToFill;
+          }
+        }
+        const auditedAnswers = verifyAndCorrectFieldAnswers(fieldsToProcess, combinedAnswerMap, userProfile);
+        const finalMappings = mergedMappings.map((m) => {
+          if (auditedAnswers[m.fieldId] !== undefined) {
+            return { ...m, valueToFill: auditedAnswers[m.fieldId], action: "fill" as const };
+          }
+          return m;
+        });
+
+        setMappings(finalMappings);
         await setSessionState({
           detectedFields: fieldsToProcess,
-          currentMappings: mergedMappings,
+          currentMappings: finalMappings,
         });
       }
     } catch (err) {
@@ -488,7 +502,7 @@ export const App: React.FC = () => {
     setErrors([]);
 
     // Update mappings with latest profile values or AI answers before autofilling
-    const enrichedMappings = mappings.map((m) => {
+    const initialEnriched = mappings.map((m) => {
       const profileVal = resolveProfileValue(m.profilePath);
       const targetVal = m.valueToFill !== undefined && m.valueToFill !== null ? m.valueToFill : profileVal;
 
@@ -496,6 +510,20 @@ export const App: React.FC = () => {
         ...m,
         valueToFill: targetVal,
       };
+    });
+
+    const prefillAnswerMap: Record<string, string | boolean | string[]> = {};
+    for (const m of initialEnriched) {
+      if (m.valueToFill !== null && m.valueToFill !== undefined) {
+        prefillAnswerMap[m.fieldId] = m.valueToFill;
+      }
+    }
+    const prefillAudited = verifyAndCorrectFieldAnswers(fields, prefillAnswerMap, userProfile);
+    const enrichedMappings = initialEnriched.map((m) => {
+      if (prefillAudited[m.fieldId] !== undefined) {
+        return { ...m, valueToFill: prefillAudited[m.fieldId], action: "fill" as const };
+      }
+      return m;
     });
 
     try {

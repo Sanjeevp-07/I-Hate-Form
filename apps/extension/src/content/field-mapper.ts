@@ -9,6 +9,29 @@ interface RuleDefinition {
 }
 
 const DETERMINISTIC_RULES: RuleDefinition[] = [
+  // 1. Composite Full Location (High Priority before individual city/state/country)
+  {
+    profilePath: "personal.location",
+    patterns: [
+      /current[\s_-]?location/i,
+      /location[\s_-]?\(.*\)/i,
+      /where[\s_-]?are[\s_-]?you[\s_-]?located/i,
+      /city[\s,]+state[\s,]+country/i,
+      /city[\s,]+state/i,
+      /^(\*|\s)*location(\*|\s)*$/i,
+      /\byour[\s_-]?location\b/i,
+      /\bcurrent[\s_-]?location\b/i,
+      /\bpresent[\s_-]?location\b/i,
+      /\blocation\b/i,
+    ],
+    getValue: (p) => {
+      const city = p.personal?.city || "Greater Noida";
+      const state = (p.personal as any)?.state || "Uttar Pradesh";
+      const country = p.personal?.country || "India";
+      return [city, state, country].filter(Boolean).join(", ");
+    },
+    confidence: 0.99,
+  },
   {
     profilePath: "personal.countryCode",
     patterns: [/country[\s_-]?code/i, /dial[\s_-]?code/i, /isd[\s_-]?code/i],
@@ -235,13 +258,25 @@ const DETERMINISTIC_RULES: RuleDefinition[] = [
   },
   {
     profilePath: "skills",
-    patterns: [/technical[\s_-]?skills/i, /^(\*|\s)*skills(\*|\s)*$/i, /key[\s_-]?skills/i, /core[\s_-]?skills/i, /technologies/i, /programming[\s_-]?languages/i],
+    patterns: [
+      /skills[\s_-]?you[\s_-]?have/i,
+      /skills[\s_-]?you[\s_-]?currently[\s_-]?have/i,
+      /what[\s_-]?skills/i,
+      /list[\s_-]?your[\s_-]?skills/i,
+      /technical[\s_-]?skills/i,
+      /key[\s_-]?skills/i,
+      /core[\s_-]?skills/i,
+      /programming[\s_-]?skills/i,
+      /technologies/i,
+      /tools[\s_-]?and[\s_-]?technologies/i,
+      /programming[\s_-]?languages/i,
+      /it[\s_-]?skills/i,
+      /\bskills?\b/i,
+    ],
     getValue: (p) => {
-      if (Array.isArray((p as any)?.skills)) {
-        return (p as any).skills.join(", ");
-      }
-      if (Array.isArray((p as any)?.skillsList)) {
-        return (p as any).skillsList.join(", ");
+      const sk = (p as any)?.skills || (p as any)?.skillsList || [];
+      if (Array.isArray(sk) && sk.length > 0) {
+        return sk.map((s: any) => typeof s === "string" ? s : s?.name || "").filter(Boolean).join(", ");
       }
       return "React, TypeScript, Next.js, Node.js, Python, Tailwind CSS, Docker, PostgreSQL";
     },
@@ -273,7 +308,7 @@ const DETERMINISTIC_RULES: RuleDefinition[] = [
   },
   {
     profilePath: "work.noticePeriod",
-    patterns: [/notice[\s_-]?period/i, /availability[\s_-]?to[\s_-]?join/i, /joining[\s_-]?time/i],
+    patterns: [/notice[\s_-]?period/i, /availability[\s_-]?to[\s_-]?join/i, /joining[\s_-]?time/i, /when[\s_-]?can[\s_-]?you[\s_-]?join/i],
     getValue: () => "Immediate Joiner",
     confidence: 0.98,
   },
@@ -290,7 +325,6 @@ const DETERMINISTIC_RULES: RuleDefinition[] = [
     confidence: 0.95,
   },
 ];
-
 
 export function mapFieldDeterministically(
   field: FieldDescriptor,
@@ -403,4 +437,153 @@ export function mapFieldDeterministically(
     source: "rule",
     reason: "No deterministic rule matched; awaiting AI analysis",
   };
+}
+
+/**
+ * Question-Answer Anti-Hallucination & Relevance Guard
+ * Audits generated or filled answers to ensure they directly answer what the form field asked.
+ * If a factual field (Location, Skills, Degree, Experience, Contact) contains a hallucinated narrative cover letter,
+ * it replaces it with the exact candidate truth.
+ */
+export function verifyAndCorrectFieldAnswers(
+  fields: FieldDescriptor[],
+  answers: Record<string, string | boolean | string[]>,
+  profile: UserProfile | null
+): Record<string, string | boolean | string[]> {
+  const correctedAnswers = { ...answers };
+  if (!fields || !profile) return correctedAnswers;
+
+  const personal = profile.personal || {};
+  const education = (profile as any).education?.institution
+    ? (profile as any).education
+    : (profile as any).currentEducation || profile.education?.[0] || {};
+  const secondary = (profile as any).secondary || {};
+  const higherSecondary = (profile as any).higherSecondary || {};
+  const rawSkills = (profile as any).skills || (profile as any).skillsList || profile.skills || [];
+  const skillsListStr = Array.isArray(rawSkills) && rawSkills.length > 0
+    ? rawSkills.map((s: any) => (typeof s === "string" ? s : s?.name || "")).filter(Boolean).join(", ")
+    : "React, TypeScript, Next.js, Python, Node.js, Tailwind CSS, Docker, PostgreSQL";
+
+  const defaultLocation = [
+    personal.city || "Greater Noida",
+    (personal as any).state || "Uttar Pradesh",
+    personal.country || "India",
+  ].filter(Boolean).join(", ");
+
+  const isNarrativeParagraph = (text: string): boolean => {
+    if (!text || typeof text !== "string") return false;
+    const t = text.toLowerCase();
+    return (
+      t.length > 75 ||
+      t.includes("i am excited") ||
+      t.includes("throughout my academic") ||
+      t.includes("academic journey") ||
+      t.includes("problem-solving skills") ||
+      t.includes("passion for innovation") ||
+      t.includes("drive growth") ||
+      t.includes("aligns with my skills") ||
+      t.includes("contribute to the") ||
+      t.includes("experience in building") ||
+      t.includes("nvidia nim") ||
+      (t.includes(" i ") && t.includes(" am "))
+    );
+  };
+
+  for (const field of fields) {
+    const rawVal = correctedAnswers[field.id];
+    if (rawVal === undefined || rawVal === null) continue;
+    const strVal = String(rawVal).trim();
+    const cleanLabel = `${field.rawLabel || ""} ${field.normalizedLabel || ""} ${field.name || ""}`.toLowerCase();
+
+    // 1. Location / City, State, Country
+    if (
+      /location|where[\s_-]?are[\s_-]?you[\s_-]?located|city[\s,]+state|city[\s,]+country/i.test(cleanLabel) ||
+      (cleanLabel.includes("city") && cleanLabel.includes("country"))
+    ) {
+      if (isNarrativeParagraph(strVal) || !strVal || strVal.toLowerCase().includes("excited")) {
+        correctedAnswers[field.id] = defaultLocation;
+      }
+      continue;
+    }
+
+    // 2. Skills / Technologies
+    if (/skills?|technolog|languages?[\s_-]?known|tools?[\s_-]?used|programming[\s_-]?languages?/i.test(cleanLabel)) {
+      if (isNarrativeParagraph(strVal) || strVal.toLowerCase().startsWith("i ") || strVal.toLowerCase().startsWith("throughout")) {
+        correctedAnswers[field.id] = skillsListStr;
+      }
+      continue;
+    }
+
+    // 3. College / University
+    if (/college|university|institution|institute/i.test(cleanLabel) && !/cgpa|gpa|marks|percentage|year/i.test(cleanLabel)) {
+      if (isNarrativeParagraph(strVal)) {
+        correctedAnswers[field.id] = education.institution || "Bennett University";
+      }
+      continue;
+    }
+
+    // 4. Degree / Branch / Major
+    if (/\bdegree\b|\bmajor\b|\bbranch\b|field[\s_-]?of[\s_-]?study/i.test(cleanLabel)) {
+      if (isNarrativeParagraph(strVal)) {
+        correctedAnswers[field.id] = /major|branch/i.test(cleanLabel)
+          ? education.major || "Computer Science and Engineering"
+          : education.degree || "B.Tech";
+      }
+      continue;
+    }
+
+    // 5. 10th Education
+    if (/10th|secondary|matriculation|class[\s_-]?10/i.test(cleanLabel)) {
+      if (/percentage|cgpa|marks|score|%/i.test(cleanLabel)) {
+        if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = String(secondary.percentageOrCgpa || "92.4");
+      } else if (/year|passing/i.test(cleanLabel)) {
+        if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = String(secondary.passingYear || "2020");
+      } else if (/school|board/i.test(cleanLabel)) {
+        if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = secondary.schoolName || "St. Xavier's High School";
+      }
+      continue;
+    }
+
+    // 6. 12th Education
+    if (/12th|higher[\s_-]?secondary|intermediate|class[\s_-]?12/i.test(cleanLabel)) {
+      if (/percentage|cgpa|marks|score|%/i.test(cleanLabel)) {
+        if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = String(higherSecondary.percentageOrCgpa || "94.8");
+      } else if (/year|passing/i.test(cleanLabel)) {
+        if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = String(higherSecondary.passingYear || "2022");
+      } else if (/school|board/i.test(cleanLabel)) {
+        if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = higherSecondary.schoolName || "DPS International School";
+      } else if (/stream|branch/i.test(cleanLabel)) {
+        if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = higherSecondary.stream || "Science (PCM)";
+      }
+      continue;
+    }
+
+    // 7. Experience (Fresher = 0)
+    if (/experience.*year|years.*experience|total.*years/i.test(cleanLabel)) {
+      if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = "0";
+      continue;
+    }
+    if (/experience.*month|months.*experience/i.test(cleanLabel)) {
+      if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = "0 months";
+      continue;
+    }
+
+    // 8. Notice Period
+    if (/notice[\s_-]?period|joining[\s_-]?time|availability/i.test(cleanLabel)) {
+      if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = "Immediate";
+      continue;
+    }
+
+    // 9. CTC / Salary
+    if (/current[\s_-]?ctc|present[\s_-]?ctc/i.test(cleanLabel)) {
+      if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = "0";
+      continue;
+    }
+    if (/expected[\s_-]?ctc|desired[\s_-]?ctc/i.test(cleanLabel)) {
+      if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = "3";
+      continue;
+    }
+  }
+
+  return correctedAnswers;
 }

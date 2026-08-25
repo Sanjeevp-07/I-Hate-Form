@@ -21,11 +21,20 @@ function cleanLabelText(text: string): string {
 function isValidLabelText(text: string, el?: Element | null): boolean {
   if (!text) return false;
   const clean = cleanLabelText(text);
-  if (clean.length < 2 || clean.length > 80) return false;
+  if (clean.length < 2 || clean.length > 120) return false;
 
   // Filter out pure icons/emojis or symbols (must contain at least 2 alphanumeric chars)
   const alphaChars = clean.match(/[a-zA-Z0-9]/g);
   if (!alphaChars || alphaChars.length < 2) return false;
+
+  // Filter out generic placeholder and non-question phrases
+  if (
+    /^(your[\s_-]?answer|your[\s_-]?response|short[\s_-]?answer([\s_-]?text)?|long[\s_-]?answer([\s_-]?text)?|paragraph[\s_-]?text|enter[\s_-]?answer|type[\s_-]?answer|write[\s_-]?answer|answer|text|input|option[\s_-]?\d+|other:?|null|undefined)$/i.test(
+      clean
+    )
+  ) {
+    return false;
+  }
 
   // Check element classes or tag if provided
   if (el) {
@@ -36,7 +45,7 @@ function isValidLabelText(text: string, el?: Element | null): boolean {
   }
 
   // Filter out button/action words
-  if (/^(submit|cancel|close|next|prev|back|ok|yes|no|register|login|sign up|sign in)$/i.test(clean)) {
+  if (/^(submit|cancel|close|next|prev|back|ok|yes|no|register|login|sign up|sign in|clear form|switch accounts|switch account)$/i.test(clean)) {
     return false;
   }
 
@@ -44,7 +53,24 @@ function isValidLabelText(text: string, el?: Element | null): boolean {
 }
 
 function findLabelForElement(element: HTMLElement): string {
-  // 1. Associated label via htmlFor within the same root node (document or ShadowRoot)
+  // 1. Google Forms / Question Container Heading (Highest priority for structured forms)
+  const container = element.closest(
+    '.Qr7Oae, [role="listitem"], .geS5n, .freebirdFormviewerViewNumberedItemContainer, .form-group, .field-wrapper, .field, .form-field, .field-item, div[class*="form"], div[class*="field"], div[class*="group"], div[class*="select"], div[class*="item"], div[class*="input"], div[class*="row"], div[class*="col"], fieldset'
+  );
+  if (container) {
+    // Check for question heading (Google Forms .M7eMe, [role="heading"], legend)
+    const headingEl = container.querySelector(
+      '.M7eMe, span.M7eMe, div.HoPnR, [role="heading"], legend, label, .label, [class*="label"], [class*="title"], [class*="header"], span, p, div'
+    );
+    if (headingEl && headingEl !== element && !headingEl.contains(element) && !element.parentElement?.contains(headingEl)) {
+      const txt = cleanLabelText(headingEl.textContent || "");
+      if (isValidLabelText(txt, headingEl)) {
+        return txt;
+      }
+    }
+  }
+
+  // 2. Associated label via htmlFor within the same root node (document or ShadowRoot)
   const id = element.getAttribute("id");
   const rootNode = element.getRootNode() as Document | ShadowRoot;
   if (id && rootNode && typeof rootNode.querySelector === "function") {
@@ -55,26 +81,22 @@ function findLabelForElement(element: HTMLElement): string {
     }
   }
 
-  // 2. Parent label element
+  // 3. Parent label element
   const parentLabel = element.closest("label");
   if (parentLabel && parentLabel.textContent) {
     const txt = cleanLabelText(parentLabel.textContent.replace(element.textContent || "", ""));
     if (isValidLabelText(txt, parentLabel)) return txt;
   }
 
-  // 3. aria-label, aria-labelledby, aria-description
-  const ariaLabel = element.getAttribute("aria-label");
-  if (ariaLabel && isValidLabelText(ariaLabel)) {
-    return cleanLabelText(ariaLabel);
-  }
-
+  // 4. aria-labelledby (filtering out generic IDs like "Your answer")
   const ariaLabelledBy = element.getAttribute("aria-labelledby");
   if (ariaLabelledBy) {
     const ids = ariaLabelledBy.split(/\s+/).filter(Boolean);
     const textPieces = ids
-      .map((id) => {
-        const el = document.getElementById(id);
-        return el ? el.textContent?.trim() : "";
+      .map((i) => {
+        const el = document.getElementById(i);
+        const txt = el ? el.textContent?.trim() : "";
+        return txt && isValidLabelText(txt, el) ? cleanLabelText(txt) : "";
       })
       .filter(Boolean);
     if (textPieces.length > 0) {
@@ -83,12 +105,18 @@ function findLabelForElement(element: HTMLElement): string {
     }
   }
 
+  // 5. aria-label & aria-description
+  const ariaLabel = element.getAttribute("aria-label");
+  if (ariaLabel && isValidLabelText(ariaLabel)) {
+    return cleanLabelText(ariaLabel);
+  }
+
   const ariaDesc = element.getAttribute("aria-description");
   if (ariaDesc && isValidLabelText(ariaDesc)) {
     return cleanLabelText(ariaDesc);
   }
 
-  // 4. Parent's preceding sibling (e.g. <div class="field-item"><span class="label">FULL NAME</span><div class="input-wrapper"><input/></div></div>)
+  // 6. Parent's preceding sibling
   let parentEl = element.parentElement;
   if (parentEl && parentEl !== document.body) {
     let parentPrev = parentEl.previousElementSibling;
@@ -101,31 +129,7 @@ function findLabelForElement(element: HTMLElement): string {
     }
   }
 
-  // 5. Closest field group / container / floating window row search (up to 4 levels)
-  const container = element.closest(
-    '.form-group, .field-wrapper, .field, .form-field, .field-item, [role="listitem"], .Qr7Oae, .geS5n, div[class*="form"], div[class*="field"], div[class*="group"], div[class*="select"], div[class*="item"], div[class*="input"], div[class*="row"], div[class*="col"], fieldset'
-  );
-  if (container) {
-    // Check for legend
-    const legend = container.querySelector("legend");
-    if (legend && legend.textContent) {
-      const txt = cleanLabelText(legend.textContent);
-      if (isValidLabelText(txt, legend)) return txt;
-    }
-
-    // Check headings, labels, uppercase text elements, or class-based labels
-    const headingEl = container.querySelector(
-      '[role="heading"], .M7eMe, span.M7eMe, div.HoPnR, label, .label, [class*="label"], [class*="title"], [class*="header"], span, p, div'
-    );
-    if (headingEl && headingEl !== element && !headingEl.contains(element) && !element.parentElement?.contains(headingEl)) {
-      const txt = cleanLabelText(headingEl.textContent || "");
-      if (isValidLabelText(txt, headingEl)) {
-        return txt;
-      }
-    }
-  }
-
-  // 6. Preceding sibling label or text element
+  // 7. Preceding sibling label or text element
   let prevEl: Element | null = element.previousElementSibling;
   while (prevEl) {
     const text = cleanLabelText(prevEl.textContent || "");
@@ -135,13 +139,11 @@ function findLabelForElement(element: HTMLElement): string {
     prevEl = prevEl.previousElementSibling;
   }
 
-  // 7. Placeholder (with clean fallback)
+  // 8. Placeholder (with clean fallback)
   const placeholder = element.getAttribute("placeholder");
-  if (placeholder && !/^please[\s_-]?select/i.test(placeholder) && !/^select/i.test(placeholder)) {
-    const cleanedPlaceholder = cleanLabelText(placeholder);
-    if (isValidLabelText(cleanedPlaceholder)) {
-      return cleanedPlaceholder;
-    }
+  if (placeholder && !/^please[\s_-]?select/i.test(placeholder) && !/^select/i.test(placeholder) && isValidLabelText(placeholder)) {
+    const clean = cleanLabelText(placeholder);
+    return clean;
   }
 
   // 8. Title, data-testid, data-automation-id, name, id

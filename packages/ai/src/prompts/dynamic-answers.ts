@@ -12,26 +12,30 @@ export function buildDynamicFieldAnswerPrompt(params: {
   fieldWarnings?: DynamicFieldWarningParam[];
 }): { system: string; user: string } {
   const system = `You are an intelligent job application autofill assistant powered by NVIDIA NIM.
-Your task is to analyze unscored / custom form fields on job application forms and generate the best, most accurate, and professional values based on the candidate's genuine background.
+Your task is to analyze unscored / custom form fields on job application forms and generate the accurate, relevant, and concise values based on the candidate's genuine background.
 
 CRITICAL DATABASE ISOLATION & ACCURACY RULES:
 1. STRICT DATABASE ISOLATION: DO NOT generate or suggest values for static candidate database fields (such as Title/Salutation, First Name, Last Name, Gender, Country Code, Email, Phone Number, Country, State, City, Address, Postal Code). Static identity and contact details are strictly retrieved from the database records.
-2. SCOPE: ONLY generate answers for dynamic/unscored fields not in the database (e.g., Total Experience Years & Months, Current CTC, Expected CTC, Notice Period, Reason for Applying, Projects summary, Behavioral questions, Cover letters).
-3. TRUTHFUL CANDIDATE CONTEXT: Never invent fake enterprise histories or unearned certifications. For students/freshers (e.g. Bennett University, 2026 graduate), set relevant defaults (Experience: 0 Years 0 Months, Current CTC: 0, Expected CTC: 3-5 Lakhs, Notice Period: Immediate).
-4. VALIDATION ERROR SELF-CORRECTION: If validation warnings are provided, output corrected values that strictly obey the field constraints (e.g., if a number field with float "3.5" shows "Please enter in numbers", output integer "3").
-
-ADDITIONAL GUIDELINES:
-1. Candidate Experience & Freshness:
-   - Check the applicant's education (current graduation year) and work experience.
-   - If the applicant is a student or fresher (or has 0 full-time corporate experience), and the field asks for "Total Years of Work Experience", "Experience in Years", or "Months" with notes like "Freshers enter 0": return "0".
-   - If asking for "Current CTC" or "Cost to Company" for freshers/students: return "0" or "0.0".
-   - If asking for "Expected CTC" for freshers/interns: return a clean numeric value like "3" or "3.5" (or "0" if internship stipend is unspecified). If the field validator enforces integers, return "3".
-   - If asking for "Notice Period": For students/freshers, choose "Immediate", "0 days", or "15 days" matching the available select options.
-2. Select / Dropdown Fields:
-   - When the field has options provided in <options>, you MUST select the exact option value or label that best matches the candidate's profile.
-3. Open-Ended Questions:
-   - For essay, behavioral, or technical questions (e.g. "Why join us?", "Describe your experience with Python"): write a concise, compelling, professional response (1-3 sentences or 50-100 words) strictly based on the applicant's projects and skills.
-5. Output Format:
+2. SCOPE & ANTI-HALLUCINATION:
+   - If the field is asking for Location, City, State, or Country (e.g. "Current Location (City, State, Country)", "Location", "Where are you located?"):
+     OUTPUT ONLY the candidate's location formatted cleanly as "City, State, Country" (e.g. "Greater Noida, Uttar Pradesh, India"). NEVER write a cover letter, paragraph, or essay!
+   - If the field is asking for Skills or Technologies (e.g. "Skills You Currently Have", "Technical Skills", "Key Skills", "What skills do you have?"):
+     OUTPUT ONLY a clean, comma-separated list of the candidate's technical skills (e.g. "React, TypeScript, Next.js, Python, Node.js, Tailwind CSS, Docker, PostgreSQL"). NEVER write an essay or narrative paragraph!
+   - If the field is asking for College / Degree / Major / Branch / Specialization:
+     OUTPUT ONLY the exact degree or institution (e.g. "Bennett University", "B.Tech", "Computer Science and Engineering").
+   - If the field is asking for 10th or 12th Marks / Year / School:
+     OUTPUT ONLY the factual percentage or year.
+3. FRESHER & STUDENT DEFAULTS:
+   - If asking for "Total Years of Work Experience", "Experience in Years", or "Months" (Freshers enter 0): return "0" or "0 months".
+   - If asking for "Current CTC" or "Salary": return "0".
+   - If asking for "Expected CTC": return "3" or "3.5".
+   - If asking for "Notice Period": return "Immediate".
+4. ESSAY & BEHAVIORAL QUESTIONS ONLY:
+   - ONLY for explicitly open-ended essay questions (e.g. "Why do you want to join this company?", "Tell us about a technical challenge you solved"):
+     Write a focused, professional 1-2 sentence response grounded in the candidate's software development projects and enthusiasm to contribute. DO NOT invent ungrounded claims.
+5. VALIDATION ERROR SELF-CORRECTION:
+   - If validation warnings are provided, output corrected values that strictly obey the field constraints (e.g., if a number field with float "3.5" shows "Please enter in numbers", output integer "3").
+6. OUTPUT FORMAT:
    - Return ONLY raw valid JSON adhering to the specified schema:
    {
      "answers": [
@@ -44,19 +48,33 @@ ADDITIONAL GUIDELINES:
      ]
    }`;
 
+  const personal = params.profile.personal || {};
+  const education: any = params.profile.education?.[0] || (params.profile as any).currentEducation || {};
+  const rawSkills = (params.profile as any).skills || params.profile.skillsList || [];
+  const skillsString = Array.isArray(rawSkills)
+    ? rawSkills.map((s: any) => (typeof s === "string" ? s : s?.name || "")).filter(Boolean).join(", ")
+    : "React, TypeScript, Next.js, Python, Node.js, Tailwind CSS, Docker, PostgreSQL";
+
   const profileSummary = {
-    name: `${params.profile.personal?.firstName || ""} ${params.profile.personal?.lastName || ""}`.trim(),
-    email: params.profile.personal?.email,
-    phone: params.profile.personal?.phone,
-    country: params.profile.personal?.country,
-    state: params.profile.personal?.state,
-    city: params.profile.personal?.city,
-    education: params.profile.education || [],
-    experience: params.profile.experience || [],
-    projects: params.profile.projects || [],
-    skills: params.profile.skills || [],
-    achievements: params.profile.achievements || [],
-    certifications: params.profile.certifications || [],
+    name: personal.fullName || `${personal.firstName || ""} ${personal.lastName || ""}`.trim() || "Sanjeev Kumar",
+    email: personal.email || "sanjeev1803t@gmail.com",
+    phone: personal.phone ? `${personal.countryCode || "+91"} ${personal.phone}` : "+91 8825171882",
+    location: [personal.city || "Greater Noida", (personal as any).state || "Uttar Pradesh", personal.country || "India"].filter(Boolean).join(", "),
+    city: personal.city || "Greater Noida",
+    state: (personal as any).state || "Uttar Pradesh",
+    country: personal.country || "India",
+    college: education.institution || "Bennett University",
+    degree: education.degree || "B.Tech",
+    branch: education.major || education.fieldOfStudy || "Computer Science and Engineering",
+    graduationYear: education.graduationYear || "2026",
+    cgpa: education.cgpa || "8.9",
+    skills: skillsString,
+    projects: [
+      {
+        name: "Full-Stack Web & Cloud Applications",
+        technologies: "React, TypeScript, Next.js, Node.js, Python, PostgreSQL",
+      },
+    ],
   };
 
   const fieldsForPrompt = params.fields.map((f) => ({
@@ -83,7 +101,7 @@ ${JSON.stringify(profileSummary, null, 2)}
 ${JSON.stringify(fieldsForPrompt, null, 2)}
 </fields_to_fill>
 ${warningsBlock}
-Generate intelligent, tailored answers for each field based on the applicant's profile and form context. If validation warnings are provided, correct the previous values to strictly comply with the form constraints. Return JSON.`;
+Generate intelligent, tailored, factual answers for each field. Remember: For location questions, output City, State, Country. For skill questions, output comma-separated skills list. Do NOT write cover letters for structured fields. Return JSON.`;
 
   return { system, user };
 }

@@ -9,6 +9,7 @@ const DEFAULT_CANDIDATE_PROFILE: UserProfile = {
   id: "user_default",
   userId: "user_default",
   personal: {
+    fullName: "Sanjeev Kumar",
     firstName: "Sanjeev",
     lastName: "Kumar",
     email: "sanjeev1803t@gmail.com",
@@ -20,17 +21,20 @@ const DEFAULT_CANDIDATE_PROFILE: UserProfile = {
     postalCode: "201306",
     address: "Knowledge Park III",
     gender: "Male",
+    nationality: "Indian",
+    dob: "2005-07-06",
   },
   links: {
-    linkedin: "https://linkedin.com/in/sanjeev-kumar",
-    github: "https://github.com/sanjeevp-07",
+    linkedin: "https://www.linkedin.com/in/sanjeev-kumar-1803t/",
+    github: "https://github.com/Sanjeevp-07",
+    portfolio: "https://port-folio-three-olive.vercel.app/",
   },
   education: [
     {
       id: "edu_1",
       institution: "Bennett University",
       degree: "B.Tech",
-      fieldOfStudy: "Computer Science",
+      fieldOfStudy: "Computer Science and Engineering",
       startDate: "2022-08-01",
       endDate: "2026-06-01",
       isCurrent: true,
@@ -40,15 +44,23 @@ const DEFAULT_CANDIDATE_PROFILE: UserProfile = {
   projects: [
     {
       id: "proj_1",
-      name: "I Hate Form",
-      description: "AI job application autofill platform with NVIDIA NIM",
-      technologies: ["React", "TypeScript", "Next.js", "NVIDIA NIM"],
+      name: "Full-Stack Web & Cloud Platforms",
+      description: "Modern web applications built with TypeScript, React, Next.js, Python, and PostgreSQL.",
+      technologies: ["React", "TypeScript", "Next.js", "Node.js", "Python", "Tailwind CSS"],
     },
   ],
   skills: [
     { id: "sk_1", category: "Languages", name: "TypeScript" },
-    { id: "sk_2", category: "Frameworks", name: "React" },
-    { id: "sk_3", category: "AI", name: "NVIDIA NIM" },
+    { id: "sk_2", category: "Languages", name: "JavaScript" },
+    { id: "sk_3", category: "Languages", name: "Python" },
+    { id: "sk_4", category: "Languages", name: "C++" },
+    { id: "sk_5", category: "Frameworks", name: "React" },
+    { id: "sk_6", category: "Frameworks", name: "Next.js" },
+    { id: "sk_7", category: "Frameworks", name: "Node.js" },
+    { id: "sk_8", category: "Frameworks", name: "Tailwind CSS" },
+    { id: "sk_9", category: "Databases", name: "PostgreSQL" },
+    { id: "sk_10", category: "Tools", name: "Docker" },
+    { id: "sk_11", category: "Tools", name: "Git" },
   ],
 };
 
@@ -66,8 +78,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing or invalid fields array" }, { status: 400 });
     }
 
-    // Retrieve active profile
-    let activeProfile: UserProfile = payloadProfile || DEFAULT_CANDIDATE_PROFILE;
+    // Retrieve active profile from payload or database
+    let activeProfile: any = payloadProfile || DEFAULT_CANDIDATE_PROFILE;
     let userId = "user_default";
 
     try {
@@ -78,8 +90,15 @@ export async function POST(req: NextRequest) {
         if (stored?.profile) {
           activeProfile = {
             ...DEFAULT_CANDIDATE_PROFILE,
+            ...stored.profile,
             personal: { ...DEFAULT_CANDIDATE_PROFILE.personal, ...stored.profile.personal },
             links: { ...DEFAULT_CANDIDATE_PROFILE.links, ...stored.profile.links },
+            education: stored.profile.education || DEFAULT_CANDIDATE_PROFILE.education,
+            secondary: stored.profile.secondary || {},
+            higherSecondary: stored.profile.higherSecondary || {},
+            skills: Array.isArray(stored.profile.skills) && stored.profile.skills.length > 0
+              ? stored.profile.skills
+              : DEFAULT_CANDIDATE_PROFILE.skills,
           };
         }
       }

@@ -5,6 +5,7 @@ import { autoUploadResume, ResumeUploadResult, SavedResumeDoc } from "./resume-u
 import { detectFieldValidationWarnings } from "./warning-detector";
 import { findBestOptionMatch } from "./dropdown-matcher";
 import { locateElement } from "./element-locator";
+import { verifyAndCorrectFieldAnswers } from "./field-mapper";
 
 export { locateElement };
 
@@ -46,6 +47,20 @@ export async function executeAutofill(
     result.resumeUpload = resumeRes;
   } catch (err) {
     console.warn("Document auto-upload encountered an error:", err);
+  }
+
+  // STEP 1.5: Question-Answer Anti-Hallucination & Relevance Guard
+  const answerMap: Record<string, string | boolean | string[]> = {};
+  for (const m of mappings) {
+    if (m.valueToFill !== null && m.valueToFill !== undefined) {
+      answerMap[m.fieldId] = m.valueToFill;
+    }
+  }
+  const auditedAnswers = verifyAndCorrectFieldAnswers(fields, answerMap, profile);
+  for (const m of mappings) {
+    if (auditedAnswers[m.fieldId] !== undefined) {
+      m.valueToFill = auditedAnswers[m.fieldId];
+    }
   }
 
   // STEP 2: Sort mappings so primary country/dial fields fill before dependent state/nationality fields
