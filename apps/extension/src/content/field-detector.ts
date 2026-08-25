@@ -28,14 +28,22 @@ function findLabelForElement(element: HTMLElement): string {
     return parentLabel.textContent.replace(element.textContent || "", "").trim();
   }
 
-  // 3. aria-label or aria-labelledby
+  // 3. aria-label or aria-labelledby (handles space-separated IDs like Google Forms "i1 i4")
   const ariaLabel = element.getAttribute("aria-label");
   if (ariaLabel) return ariaLabel.trim();
 
   const ariaLabelledBy = element.getAttribute("aria-labelledby");
   if (ariaLabelledBy) {
-    const labelledEl = document.getElementById(ariaLabelledBy);
-    if (labelledEl && labelledEl.textContent) return labelledEl.textContent.trim();
+    const ids = ariaLabelledBy.split(/\s+/).filter(Boolean);
+    const textPieces = ids
+      .map((id) => {
+        const el = document.getElementById(id);
+        return el ? el.textContent?.trim() : "";
+      })
+      .filter(Boolean);
+    if (textPieces.length > 0) {
+      return textPieces.join(" ");
+    }
   }
 
   // 4. Placeholder (if not a generic placeholder like "Please Select" or "Enter value")
@@ -44,12 +52,15 @@ function findLabelForElement(element: HTMLElement): string {
     return placeholder.trim();
   }
 
-  // 5. Container / Field-group label search
-  const containerLabel = element.closest(
-    '.form-group, .field-wrapper, .field, .form-field, div[class*="form"], div[class*="field"], div[class*="group"], div[class*="select"], div[class*="item"]'
-  )?.querySelector("label");
-  if (containerLabel && containerLabel.textContent) {
-    return containerLabel.textContent.trim();
+  // 5. Container / Field-group label / Google Forms Question Title search
+  const container = element.closest(
+    '.form-group, .field-wrapper, .field, .form-field, [role="listitem"], .Qr7Oae, .geS5n, div[class*="form"], div[class*="field"], div[class*="group"], div[class*="select"], div[class*="item"]'
+  );
+  if (container) {
+    const headingEl = container.querySelector('[role="heading"], .M7eMe, span.M7eMe, div.HoPnR, label, .label');
+    if (headingEl && headingEl.textContent) {
+      return headingEl.textContent.trim();
+    }
   }
 
   // 6. Preceding sibling label search

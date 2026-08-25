@@ -10,11 +10,20 @@ export interface SessionUser {
 }
 
 // Master Admin Emails
-export const ADMIN_EMAILS = ["sanjeev1803t@gmail.com"];
+export const DEFAULT_ADMIN_EMAILS = ["sanjeev1803t@gmail.com"];
+
+export function getAdminEmails(): string[] {
+  const envAdmins = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return Array.from(new Set([...DEFAULT_ADMIN_EMAILS, ...envAdmins]));
+}
 
 export function isAdminUser(email?: string | null): boolean {
   if (!email) return false;
-  return ADMIN_EMAILS.includes(email.toLowerCase().trim());
+  const normalized = email.toLowerCase().trim();
+  return getAdminEmails().includes(normalized);
 }
 
 const JWT_SECRET = process.env.EXTENSION_JWT_SECRET || "ihateform_secure_jwt_secret_token_2026";

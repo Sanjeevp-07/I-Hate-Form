@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/auth";
+import { getAuthenticatedUser, isAdminUser } from "@/lib/auth";
 import { prisma } from "@internship-copilot/database";
 
 export async function GET(req: NextRequest) {
@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
     if (!sessionUser) {
       return NextResponse.json({ authenticated: false, user: null }, { status: 401 });
     }
+
+    const isAdmin = sessionUser.isAdmin ?? isAdminUser(sessionUser.email);
 
     let profile = null;
     try {
@@ -36,6 +38,7 @@ export async function GET(req: NextRequest) {
         id: sessionUser.id,
         email: sessionUser.email,
         name: sessionUser.name,
+        isAdmin,
         profile,
       },
     });

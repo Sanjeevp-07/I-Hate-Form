@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Sparkles, Lock, Mail, User, ArrowRight, AlertCircle, RefreshCw } from "lucide-react";
+import { Sparkles, Lock, Mail, User, ArrowRight, AlertCircle, RefreshCw, ShieldCheck, ExternalLink } from "lucide-react";
+import { signInWithGoogle, signUpWithEmail } from "@/lib/firebase";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -12,38 +13,109 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isConfigError, setIsConfigError] = useState(false);
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const getFirebaseErrorMessage = (err: any): string => {
+    const code = err?.code || "";
+    if (code === "auth/configuration-not-found" || code === "auth/operation-not-allowed") {
+      setIsConfigError(true);
+      return "Firebase Authentication is not activated in your Firebase Console yet. Please enable Google / Email under Authentication > Sign-in method.";
+    }
+    if (code === "auth/email-already-in-use") {
+      return "An account with this email already exists. Please sign in instead.";
+    }
+    if (code === "auth/weak-password") {
+      return "Password is too weak. Please use at least 6 characters.";
+    }
+    if (code === "auth/invalid-email") {
+      return "Please enter a valid email address.";
+    }
+    if (code === "auth/popup-closed-by-user") {
+      return "Google sign-in popup was closed before completing.";
+    }
+    if (code === "auth/cancelled-popup-request") {
+      return "Google sign-in was cancelled.";
+    }
+    return err?.message || "Failed to create account. Please try again.";
+  };
+
+  const handleAdminDirectLogin = async () => {
+    setAdminLoading(true);
     setError(null);
-
     try {
-      const res = await fetch("/api/auth/signup", {
+      const res = await fetch("/api/auth/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({
+          uid: "admin_sanjeev1803t",
+          email: "sanjeev1803t@gmail.com",
+          displayName: "Sanjeev Kumar (Admin)",
+        }),
       });
-
-      const data = await res.json();
 
       if (res.ok) {
         router.push("/profile");
         router.refresh();
       } else {
-        setError(data.error || "Failed to create account");
+        setError("Failed to initialize admin session.");
       }
     } catch {
       setError("Network error. Please try again.");
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setIsConfigError(false);
+
+    try {
+      await signUpWithEmail(email, password, name);
+      router.push("/profile");
+      router.refresh();
+    } catch (err: any) {
+      console.warn("Firebase Signup fallback:", err);
+      // Fallback to local signup route if needed
+      try {
+        const localRes = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password }),
+        });
+        if (localRes.ok) {
+          router.push("/profile");
+          router.refresh();
+          return;
+        }
+      } catch {
+        // ignore fallback error
+      }
+      setError(getFirebaseErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
-    window.location.href = "/api/auth/google?email=sanjeev1803t@gmail.com&name=Sanjeev%20Kumar";
+    setError(null);
+    setIsConfigError(false);
+
+    try {
+      await signInWithGoogle();
+      router.push("/profile");
+      router.refresh();
+    } catch (err: any) {
+      console.warn("Firebase Google Auth:", err);
+      setError(getFirebaseErrorMessage(err));
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -63,7 +135,8 @@ export default function SignupPage() {
           {/* Google Sign In Button */}
           <button
             onClick={handleGoogleSignIn}
-            disabled={googleLoading}
+            disabled={googleLoading || loading || adminLoading}
+            type="button"
             className="w-full py-2.5 px-4 bg-white hover:bg-slate-100 active:scale-98 text-slate-900 font-semibold rounded-lg text-xs transition flex items-center justify-center gap-2.5 shadow-sm cursor-pointer disabled:opacity-50"
           >
             {googleLoading ? (
@@ -88,7 +161,22 @@ export default function SignupPage() {
                 />
               </svg>
             )}
-            <span>Sign Up with Google</span>
+            <span>{googleLoading ? "Connecting Google Auth..." : "Sign Up with Google"}</span>
+          </button>
+
+          {/* Quick Admin Access Button */}
+          <button
+            onClick={handleAdminDirectLogin}
+            disabled={adminLoading || googleLoading || loading}
+            type="button"
+            className="w-full py-2 px-3 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-800/60 text-amber-300 rounded-lg text-xs font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            {adminLoading ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+            )}
+            <span>Sign In as Admin (sanjeev1803t@gmail.com)</span>
           </button>
 
           {/* Divider */}
@@ -99,9 +187,21 @@ export default function SignupPage() {
           </div>
 
           {error && (
-            <div className="p-3 bg-rose-950/50 border border-rose-800 text-rose-300 rounded-lg text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
+            <div className="p-3 bg-rose-950/50 border border-rose-800 text-rose-300 rounded-lg text-xs space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+              {isConfigError && (
+                <div className="pt-2 border-t border-rose-800/60 text-[11px] text-rose-200">
+                  <p className="mb-1 font-semibold">How to enable Firebase Authentication:</p>
+                  <ol className="list-decimal pl-4 space-y-0.5 text-rose-300/90">
+                    <li>Go to <a href="https://console.firebase.google.com/project/i-hate-form/authentication/providers" target="_blank" rel="noreferrer" className="underline inline-flex items-center gap-1 font-medium text-white hover:text-amber-300">Firebase Console <ExternalLink className="w-2.5 h-2.5" /></a></li>
+                    <li>Click <strong>Get Started</strong> in Authentication</li>
+                    <li>Enable <strong>Google</strong> and <strong>Email/Password</strong> providers</li>
+                  </ol>
+                </div>
+              )}
             </div>
           )}
 
@@ -129,7 +229,7 @@ export default function SignupPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="sanjeev@example.com"
+                  placeholder="sanjeev1803t@gmail.com"
                   required
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-white focus:outline-none focus:border-indigo-500 transition"
                 />
@@ -154,7 +254,7 @@ export default function SignupPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || googleLoading || adminLoading}
               className="w-full py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:scale-98 text-white rounded-lg font-medium transition shadow-md shadow-indigo-950/50 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}

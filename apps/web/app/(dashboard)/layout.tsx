@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { User, FileText, Briefcase, LayoutDashboard, Sparkles, LogOut, LogIn, Users, Database, ShieldAlert } from "lucide-react";
+import { logoutUser } from "@/lib/firebase";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -15,7 +16,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.user) {
-          const isAdmin = data.user.email?.toLowerCase().trim() === "sanjeev1803t@gmail.com";
+          const isAdmin = data.user.isAdmin ?? (data.user.email?.toLowerCase().trim() === "sanjeev1803t@gmail.com");
           setCurrentUser({ ...data.user, isAdmin });
         }
       })
@@ -23,7 +24,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await logoutUser();
     setCurrentUser(null);
     router.push("/login");
     router.refresh();
