@@ -31,7 +31,7 @@ export function scanFormFieldsWithStats(): ScanResultWithStats {
   const descriptors: FieldDescriptor[] = [];
   const visitedElements = new Set<HTMLElement>();
 
-  matchedElements.forEach((element, index) => {
+  matchedElements.forEach((element) => {
     if (visitedElements.has(element)) {
       return;
     }
@@ -66,7 +66,10 @@ export function scanFormFieldsWithStats(): ScanResultWithStats {
       }
     }
 
-    const descriptor = extractFieldDescriptor(element, index);
+    const descriptor = extractFieldDescriptor(element, descriptors.length);
+    try {
+      element.setAttribute("data-ihateform-id", descriptor.id);
+    } catch {}
     descriptors.push(descriptor);
   });
 

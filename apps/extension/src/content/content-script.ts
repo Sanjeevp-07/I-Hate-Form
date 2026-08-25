@@ -3,6 +3,7 @@ import { executeAutofill } from "./autofill-engine";
 import { findResumeUploadInputs, autoUploadResume } from "./resume-uploader";
 import { FrameRegistry } from "./frame-registry";
 import { FormMutationWatcher } from "./mutation-observer";
+import { injectGoogleFormsHelperStyles } from "./event-dispatcher";
 import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPayload } from "../types";
 
 // Wrap in self-invoking function and guard against duplicate injection
@@ -11,6 +12,9 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
     return;
   }
   (window as any).__IHATEFORM_CONTENT_SCRIPT_INITIALIZED__ = true;
+
+  // Inject helper styles (e.g. Google Forms placeholder cleanup)
+  injectGoogleFormsHelperStyles();
 
   // Initialize frame registry for this context
   const frameMeta = FrameRegistry.initialize();

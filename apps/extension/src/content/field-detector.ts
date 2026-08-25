@@ -217,11 +217,22 @@ export function extractFieldDescriptor(element: HTMLElement, index: number): Fie
   const required = element.hasAttribute("required") || element.getAttribute("aria-required") === "true";
   const disabled = element.hasAttribute("disabled") || element.getAttribute("aria-disabled") === "true";
 
-  const selector = element.id
-    ? `#${element.id}`
-    : name
-    ? `${tag}[name="${name}"]`
-    : `${tag}:nth-of-type(${index + 1})`;
+  let selector = "";
+  if (element.id) {
+    selector = `#${element.id}`;
+  } else if (element.getAttribute("aria-labelledby")) {
+    selector = `${tag}[aria-labelledby="${element.getAttribute("aria-labelledby")}"]`;
+  } else if (name) {
+    selector = `${tag}[name="${name}"]`;
+  } else if (element.getAttribute("aria-label")) {
+    selector = `${tag}[aria-label="${element.getAttribute("aria-label")}"]`;
+  } else if (element.getAttribute("jsname")) {
+    selector = `${tag}[jsname="${element.getAttribute("jsname")}"]`;
+  } else if (placeholder) {
+    selector = `${tag}[placeholder="${placeholder}"]`;
+  } else {
+    selector = `${tag}:nth-of-type(${index + 1})`;
+  }
 
   const frameId = FrameRegistry.getFrameId();
   const id = `f_${frameId}_${index}_${computeHash(selector + rawLabel)}`;

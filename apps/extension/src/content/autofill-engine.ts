@@ -1,9 +1,12 @@
 import { FieldDescriptor, FieldError, FieldMapping, UserProfile } from "@internship-copilot/types";
 import { querySelectorAllDeep } from "./shadow-dom-walker";
-import { setNativeValue } from "./event-dispatcher";
+import { setNativeValue, applyGoogleFormsState } from "./event-dispatcher";
 import { autoUploadResume, ResumeUploadResult, SavedResumeDoc } from "./resume-uploader";
 import { detectFieldValidationWarnings } from "./warning-detector";
 import { findBestOptionMatch } from "./dropdown-matcher";
+import { locateElement } from "./element-locator";
+
+export { locateElement };
 
 export interface AutofillFieldCorrection {
   fieldId: string;
@@ -79,108 +82,17 @@ export async function executeAutofill(
 
   const pendingSelectRetries: Array<{ fieldDescriptor: FieldDescriptor; mapping: FieldMapping }> = [];
 
-  const locateElement = (fieldDescriptor: FieldDescriptor, allElements: HTMLElement[]): HTMLElement | undefined => {
-    // 1. Locate element by ID or Name attribute
-    let target = allElements.find(
-      (el) =>
-        (el.id && (`#${el.id}` === fieldDescriptor.domSelector || el.id === fieldDescriptor.name || el.id === fieldDescriptor.id)) ||
-        (el.getAttribute("name") &&
-          (`${el.tagName.toLowerCase()}[name="${el.getAttribute("name")}"]` ===
-            fieldDescriptor.domSelector ||
-            el.getAttribute("name") === fieldDescriptor.name))
-    );
-
-    // 2. Query selector search
-    if (!target && fieldDescriptor.domSelector) {
-      try {
-        const found = document.querySelector(fieldDescriptor.domSelector);
-        if (found instanceof HTMLElement) {
-          target = found;
-        }
-      } catch {}
-    }
-
-    // 3. Placeholder match in allElements (including shadow DOM and modals)
-    if (!target && fieldDescriptor.placeholder) {
-      target = allElements.find(
-        (el) => el.getAttribute("placeholder")?.trim() === fieldDescriptor.placeholder?.trim()
-      );
-    }
-
-    // 4. Aria-label match
-    if (!target && fieldDescriptor.ariaLabel) {
-      target = allElements.find(
-        (el) => el.getAttribute("aria-label")?.trim() === fieldDescriptor.ariaLabel?.trim()
-      );
-    }
-
-    // 5. Label-based search
-    if (!target && fieldDescriptor.rawLabel) {
-      const cleanTargetLabel = fieldDescriptor.rawLabel.replace(/[*:]/g, "").trim().toLowerCase();
-      const labels = Array.from(document.querySelectorAll("label"));
-      for (const lbl of labels) {
-        const lblText = (lbl.textContent || "").replace(/[*:]/g, "").trim().toLowerCase();
-        if (lblText === cleanTargetLabel || lblText.includes(cleanTargetLabel)) {
-          // Check for label htmlFor
-          const forId = lbl.getAttribute("for");
-          if (forId) {
-            const el = document.getElementById(forId);
-            if (el && el.tagName.toLowerCase() === fieldDescriptor.tag.toLowerCase()) {
-              target = el;
-              break;
-            }
-          }
-          // Check child inputs
-          const childInput = lbl.querySelector(fieldDescriptor.tag);
-          if (childInput instanceof HTMLElement) {
-            target = childInput;
-            break;
-          }
-          // Check next sibling
-          const nextEl = lbl.nextElementSibling;
-          if (nextEl) {
-            if (nextEl.tagName.toLowerCase() === fieldDescriptor.tag.toLowerCase()) {
-              target = nextEl as HTMLElement;
-              break;
-            }
-            const nested = nextEl.querySelector(fieldDescriptor.tag);
-            if (nested instanceof HTMLElement) {
-              target = nested;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    // 6. Fallback: match by index within tag group
-    if (!target) {
-      const sameTagElements = allElements.filter(
-        (el) => el.tagName.toLowerCase() === fieldDescriptor.tag.toLowerCase()
-      );
-      const fieldIndexInTag = fields
-        .filter((f) => f.tag.toLowerCase() === fieldDescriptor.tag.toLowerCase())
-        .indexOf(fieldDescriptor);
-
-      if (fieldIndexInTag >= 0 && sameTagElements[fieldIndexInTag]) {
-        target = sameTagElements[fieldIndexInTag];
-      }
-    }
-
-    // 7. Last fallback: match by position index across all form elements
-    if (!target) {
-      const fieldIdx = fields.indexOf(fieldDescriptor);
-      if (fieldIdx >= 0 && allElements[fieldIdx]) {
-        target = allElements[fieldIdx];
-      }
-    }
-
-    return target;
-  };
-
   const allDOMElements = querySelectorAllDeep(
     "input, select, textarea, [role='textbox'], [role='combobox'], [role='searchbox'], [role='spinbutton'], [contenteditable='true'], [contenteditable='']"
-  );
+  ).filter((element) => {
+    if (element instanceof HTMLInputElement) {
+      const type = (element.type || "text").toLowerCase();
+      if (["hidden", "submit", "button", "reset", "image"].includes(type)) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const filledValuesMap = new Map<string, string | boolean>();
 
@@ -455,6 +367,20 @@ export async function executeAutofill(
   } catch (err) {
     console.warn("Error during post-autofill validation self-correction:", err);
   }
+
+  // Final pass: Re-apply Google Forms state cleanup across all filled fields
+  try {
+    for (const fieldId of result.filledFieldIds) {
+      const fd = fields.find((f) => f.id === fieldId);
+      if (fd) {
+        const el = locateElement(fd, allDOMElements, fields);
+        const val = filledValuesMap.get(fieldId);
+        if (el && val !== undefined && val !== null) {
+          applyGoogleFormsState(el, String(val));
+        }
+      }
+    }
+  } catch {}
 
   return result;
 }

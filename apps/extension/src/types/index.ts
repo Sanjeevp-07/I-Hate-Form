@@ -2,6 +2,7 @@ import { FieldDescriptor, FieldMapping, FieldError } from "@internship-copilot/t
 
 export interface ExtensionMessage<T = unknown> {
   type:
+    | "PING"
     | "SCAN_FORM"
     | "SCAN_RESULT"
     | "FILL_FIELDS"

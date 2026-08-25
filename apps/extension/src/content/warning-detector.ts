@@ -1,4 +1,5 @@
 import { FieldDescriptor } from "@internship-copilot/types";
+import { locateElement } from "./element-locator";
 
 export interface FieldValidationWarning {
   fieldId: string;
@@ -122,22 +123,7 @@ export function detectFieldValidationWarnings(
   for (const field of fields) {
     const filledVal = filledValues.get(field.id) ?? "";
 
-    // Locate element
-    let target = allElements.find(
-      (el) =>
-        (el.id && (`#${el.id}` === field.domSelector || el.id === field.name || el.id === field.id)) ||
-        (el.getAttribute("name") &&
-          (`${el.tagName.toLowerCase()}[name="${el.getAttribute("name")}"]` === field.domSelector ||
-            el.getAttribute("name") === field.name))
-    );
-
-    if (!target && field.domSelector) {
-      try {
-        const found = document.querySelector(field.domSelector);
-        if (found instanceof HTMLElement) target = found;
-      } catch {}
-    }
-
+    const target = locateElement(field, allElements, fields);
     if (!target) continue;
 
     let warningText = detectElementWarning(target);
