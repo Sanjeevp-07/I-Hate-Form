@@ -1,7 +1,7 @@
 import { FieldDescriptor, FieldError, FieldMapping, UserProfile } from "@internship-copilot/types";
 import { querySelectorAllDeep } from "./shadow-dom-walker";
 import { setNativeValue } from "./event-dispatcher";
-import { autoUploadResume, ResumeUploadResult } from "./resume-uploader";
+import { autoUploadResume, ResumeUploadResult, SavedResumeDoc } from "./resume-uploader";
 import { detectFieldValidationWarnings } from "./warning-detector";
 import { findBestOptionMatch } from "./dropdown-matcher";
 
@@ -26,7 +26,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function executeAutofill(
   fields: FieldDescriptor[],
   mappings: FieldMapping[],
-  profile: UserProfile | null = null
+  profile: UserProfile | null = null,
+  savedResume?: SavedResumeDoc | null
 ): Promise<AutofillResult> {
   const result: AutofillResult = {
     filledFieldIds: [],
@@ -37,7 +38,7 @@ export async function executeAutofill(
 
   // STEP 1: Scan and upload Resume PDF as the VERY FIRST task before filling any field
   try {
-    const resumeRes = autoUploadResume(profile);
+    const resumeRes = autoUploadResume(profile, savedResume);
     result.resumeUpload = resumeRes;
   } catch (err) {
     console.warn("Resume auto-upload encountered an error:", err);
@@ -99,7 +100,21 @@ export async function executeAutofill(
       } catch {}
     }
 
-    // 3. Label-based search
+    // 3. Placeholder match in allElements (including shadow DOM and modals)
+    if (!target && fieldDescriptor.placeholder) {
+      target = allElements.find(
+        (el) => el.getAttribute("placeholder")?.trim() === fieldDescriptor.placeholder?.trim()
+      );
+    }
+
+    // 4. Aria-label match
+    if (!target && fieldDescriptor.ariaLabel) {
+      target = allElements.find(
+        (el) => el.getAttribute("aria-label")?.trim() === fieldDescriptor.ariaLabel?.trim()
+      );
+    }
+
+    // 5. Label-based search
     if (!target && fieldDescriptor.rawLabel) {
       const cleanTargetLabel = fieldDescriptor.rawLabel.replace(/[*:]/g, "").trim().toLowerCase();
       const labels = Array.from(document.querySelectorAll("label"));
@@ -138,7 +153,7 @@ export async function executeAutofill(
       }
     }
 
-    // 4. Fallback: match by index within tag group
+    // 6. Fallback: match by index within tag group
     if (!target) {
       const sameTagElements = allElements.filter(
         (el) => el.tagName.toLowerCase() === fieldDescriptor.tag.toLowerCase()
@@ -152,7 +167,7 @@ export async function executeAutofill(
       }
     }
 
-    // 5. Last fallback: match by position index across all form elements
+    // 7. Last fallback: match by position index across all form elements
     if (!target) {
       const fieldIdx = fields.indexOf(fieldDescriptor);
       if (fieldIdx >= 0 && allElements[fieldIdx]) {
@@ -163,7 +178,9 @@ export async function executeAutofill(
     return target;
   };
 
-  const allDOMElements = querySelectorAllDeep("input, select, textarea");
+  const allDOMElements = querySelectorAllDeep(
+    "input, select, textarea, [role='textbox'], [role='combobox'], [role='searchbox'], [role='spinbutton'], [contenteditable='true'], [contenteditable='']"
+  );
 
   const filledValuesMap = new Map<string, string | boolean>();
 

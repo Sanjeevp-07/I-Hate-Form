@@ -3,7 +3,7 @@ import { FieldDescriptor, FieldError, FieldMapping } from "@internship-copilot/t
 import { CONFIDENCE_THRESHOLDS } from "@internship-copilot/config";
 import { mapFieldDeterministically } from "../content/field-mapper";
 import { getSessionState, setSessionState } from "../storage/chrome-storage";
-import { Shield, Play, RefreshCw, Sparkles, Lock, Layers, AlertCircle, CheckCircle2, LogIn, ChevronDown, FileText, Upload } from "lucide-react";
+import { Shield, Play, RefreshCw, Sparkles, Lock, Layers, AlertCircle, CheckCircle2, LogIn, ChevronDown, FileText, Upload, Scan } from "lucide-react";
 
 const BACKEND_BASE_URL = "http://localhost:3000";
 
@@ -34,6 +34,14 @@ export const App: React.FC = () => {
     corrections?: Array<{ fieldId: string; rawLabel: string; previousValue: any; correctedValue: any; warningMessage: string }>;
   } | null>(null);
 
+  const [savedResume, setSavedResume] = useState<{
+    id: string;
+    filename: string;
+    fileData?: string;
+    mimeType?: string;
+    sizeBytes?: number;
+  } | null>(null);
+
   // Check authentication status and fetch user profile
   const checkAuthAndFetchProfile = async () => {
     setAuthState((prev) => ({ ...prev, loading: true }));
@@ -51,7 +59,7 @@ export const App: React.FC = () => {
             user: authData.user,
           });
 
-          // Fetch full profile data
+          // 1. Fetch full profile data
           const profRes = await fetch(`${BACKEND_BASE_URL}/api/profile`, {
             credentials: "include",
           });
@@ -59,6 +67,20 @@ export const App: React.FC = () => {
             const profData = await profRes.json();
             setUserProfile(profData.profile || null);
           }
+
+          // 2. Fetch preferred resume stored in the database
+          try {
+            const resumeRes = await fetch(`${BACKEND_BASE_URL}/api/documents/preferred`, {
+              credentials: "include",
+            });
+            if (resumeRes.ok) {
+              const resumeData = await resumeRes.json();
+              setSavedResume(resumeData.document || null);
+            }
+          } catch (e) {
+            console.warn("Could not fetch preferred resume:", e);
+          }
+
           return;
         }
       }
@@ -151,20 +173,53 @@ export const App: React.FC = () => {
         return links.github || null;
       case "links.portfolio":
         return links.portfolio || null;
+      case "work.experienceYears":
+        return "0";
+      case "work.experienceMonths":
+        return "0 months";
+      case "work.currentCtc":
+        return "0";
+      case "work.expectedCtc":
+        return "3";
+      case "work.noticePeriod":
+        return "Immediate Joiner";
+      case "personal.password":
+      case "personal.confirmPassword":
+        return (personal as any)?.password || "Password@12345";
       default:
         return null;
     }
   };
 
+
   const ensureContentScriptInjected = async (tabId: number): Promise<boolean> => {
     try {
-      if (typeof chrome !== "undefined" && chrome.scripting) return true;
-      await chrome.scripting.executeScript({
-        target: { tabId, allFrames: true },
-        files: ["content.js"],
+      if (typeof chrome === "undefined" || !chrome.scripting) return false;
+      // Ping content script first
+      const isAlive = await new Promise<boolean>((resolve) => {
+        try {
+          chrome.tabs.sendMessage(tabId, { type: "PING" }, (res) => {
+            if (chrome.runtime.lastError || !res?.pong) {
+              resolve(false);
+            } else {
+              resolve(true);
+            }
+          });
+        } catch {
+          resolve(false);
+        }
       });
+
+      if (!isAlive) {
+        await chrome.scripting.executeScript({
+          target: { tabId, allFrames: true },
+          files: ["content.js"],
+        });
+        await new Promise((r) => setTimeout(r, 100));
+      }
       return true;
-    } catch {
+    } catch (err) {
+      console.warn("Could not inject content script:", err);
       return false;
     }
   };
@@ -218,7 +273,7 @@ export const App: React.FC = () => {
 
         // Also check if field matches any standard database profile field
         const combined = `${f.normalizedLabel} ${f.rawLabel} ${f.name || ""} ${f.nearbyText || ""}`.toLowerCase();
-        const isStaticDatabaseField = /first[\s_-]?name|last[\s_-]?name|middle[\s_-]?name|full[\s_-]?name|e[\s_-]?mail|phone|mobile|country[\s_-]?code|dial[\s_-]?code|isd[\s_-]?code|gender|\bsex\b|nationality|citizenship|\btitle\b|salutation|prefix|date[\s_-]?of[\s_-]?birth|d[\s_-]?o[\s_-]?b|pincode|postal|zip|state|province|city|country|address|street|linkedin|github/i.test(combined);
+        const isStaticDatabaseField = /first[\s_-]?name|last[\s_-]?name|middle[\s_-]?name|full[\s_-]?name|e[\s_-]?mail|phone|mobile|country[\s_-]?code|dial[\s_-]?code|isd[\s_-]?code|gender|\bsex\b|nationality|citizenship|\btitle\b|salutation|prefix|date[\s_-]?of[\s_-]?birth|d[\s_-]?o[\s_-]?b|pincode|postal|zip|state|province|city|country|address|street|linkedin|github|password/i.test(combined);
 
         if (isStaticDatabaseField) {
           return false;
@@ -252,7 +307,7 @@ export const App: React.FC = () => {
           if (current?.profilePath) return current;
 
           const combined = `${f.normalizedLabel} ${f.rawLabel} ${f.name || ""}`.toLowerCase();
-          const isStaticDatabaseField = /first[\s_-]?name|last[\s_-]?name|middle[\s_-]?name|full[\s_-]?name|e[\s_-]?mail|phone|mobile|country[\s_-]?code|dial[\s_-]?code|isd[\s_-]?code|gender|\bsex\b|nationality|citizenship|\btitle\b|salutation|prefix|date[\s_-]?of[\s_-]?birth|d[\s_-]?o[\s_-]?b|pincode|postal|zip|state|province|city|country|address|street|linkedin|github/i.test(combined);
+          const isStaticDatabaseField = /first[\s_-]?name|last[\s_-]?name|middle[\s_-]?name|full[\s_-]?name|e[\s_-]?mail|phone|mobile|country[\s_-]?code|dial[\s_-]?code|isd[\s_-]?code|gender|\bsex\b|nationality|citizenship|\btitle\b|salutation|prefix|date[\s_-]?of[\s_-]?birth|d[\s_-]?o[\s_-]?b|pincode|postal|zip|state|province|city|country|address|street|linkedin|github|password/i.test(combined);
           if (isStaticDatabaseField) return current;
 
           const aiMatch = aiMappings.find((aim) => aim.fieldId === f.id);
@@ -265,6 +320,7 @@ export const App: React.FC = () => {
               source: "ai_strong" as const,
             };
           }
+
           return current;
         });
 
@@ -292,49 +348,84 @@ export const App: React.FC = () => {
         if (tab?.id) {
           await ensureContentScriptInjected(tab.id);
 
-          chrome.tabs.sendMessage(
-            tab.id,
-            { type: "SCAN_FORM" },
-            async (response) => {
-              if (chrome.runtime.lastError) {
-                setIsScanning(false);
-                return;
-              }
+          // Multi-frame scan across top frame and floating iframe/modal frames
+          let allFields: FieldDescriptor[] = [];
+          let totalClosedRoots = 0;
+          let hasResume = false;
 
-              if (response && response.fields) {
-                const detected: FieldDescriptor[] = response.fields;
-                setFields(detected);
-                setClosedRootsCount(response.closedShadowRootsDetected || 0);
-                setHasResumeField(Boolean(response.hasResumeField));
+          try {
+            if (chrome.scripting) {
+              const execResults = await chrome.scripting.executeScript({
+                target: { tabId: tab.id, allFrames: true },
+                func: () => {
+                  if (typeof (window as any).__IHATEFORM_SCAN_WITH_STATS__ === "function") {
+                    return (window as any).__IHATEFORM_SCAN_WITH_STATS__();
+                  }
+                  return null;
+                },
+              });
 
-                // 1. Map fields deterministically from user profile
-                const initialMappings: FieldMapping[] = detected.map((f) => {
-                  const m = mapFieldDeterministically(f, null);
-                  const realVal = resolveProfileValue(m.profilePath);
-                  return {
-                    ...m,
-                    valueToFill: realVal,
-                    action: realVal ? "fill" : m.action,
-                    confidence: realVal ? 0.98 : m.confidence,
-                  };
-                });
-
-                setMappings(initialMappings);
-
-                await setSessionState({
-                  detectedFields: detected,
-                  currentMappings: initialMappings,
-                });
-
-                setIsScanning(false);
-
-                // 2. Automatically generate NVIDIA NIM AI answers for remaining fields (experience, CTC, notice period, essays, etc.)
-                handleGenerateAIAnswers(detected, initialMappings);
-              } else {
-                setIsScanning(false);
+              if (execResults && execResults.length > 0) {
+                for (const res of execResults) {
+                  if (res.result && Array.isArray(res.result.fields)) {
+                    allFields.push(...res.result.fields);
+                    totalClosedRoots += res.result.closedShadowRootsDetected || 0;
+                    if (res.result.hasResumeField) hasResume = true;
+                  }
+                }
               }
             }
-          );
+          } catch (scriptErr) {
+            console.warn("Direct multi-frame script scan failed, falling back to message dispatch:", scriptErr);
+          }
+
+          // Message-based fallback if scripting execution returned no fields
+          if (allFields.length === 0) {
+            await new Promise<void>((resolve) => {
+              chrome.tabs.sendMessage(
+                tab.id!,
+                { type: "SCAN_FORM" },
+                (response) => {
+                  if (!chrome.runtime.lastError && response && response.fields) {
+                    allFields = response.fields;
+                    totalClosedRoots = response.closedShadowRootsDetected || 0;
+                    hasResume = Boolean(response.hasResumeField);
+                  }
+                  resolve();
+                }
+              );
+            });
+          }
+
+          setFields(allFields);
+          setClosedRootsCount(totalClosedRoots);
+          setHasResumeField(hasResume);
+
+          // 1. Map fields deterministically from user profile
+          const initialMappings: FieldMapping[] = allFields.map((f) => {
+            const m = mapFieldDeterministically(f, null);
+            const realVal = resolveProfileValue(m.profilePath);
+            return {
+              ...m,
+              valueToFill: realVal,
+              action: realVal ? "fill" : m.action,
+              confidence: realVal ? 0.98 : m.confidence,
+            };
+          });
+
+          setMappings(initialMappings);
+
+          await setSessionState({
+            detectedFields: allFields,
+            currentMappings: initialMappings,
+          });
+
+          setIsScanning(false);
+
+          if (allFields.length > 0) {
+            // 2. Automatically generate NVIDIA NIM AI answers for remaining fields
+            handleGenerateAIAnswers(allFields, initialMappings);
+          }
         } else {
           setIsScanning(false);
         }
@@ -367,50 +458,105 @@ export const App: React.FC = () => {
         if (tab?.id) {
           await ensureContentScriptInjected(tab.id);
 
-          chrome.tabs.sendMessage(
-            tab.id,
-            {
-              type: "FILL_FIELDS",
-              payload: { mappings: enrichedMappings, profile: userProfile },
-            },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                setIsFilling(false);
-                return;
-              }
+          let totalFilled: string[] = [];
+          let totalSkipped: string[] = [];
+          let allErrors: FieldError[] = [];
+          let allCorrections: any[] = [];
+          let resumeUploaded = false;
+          let resumeName = "";
 
-              if (response) {
-                setFillSummary({
-                  filled: response.filledFieldIds?.length || 0,
-                  skipped: response.skippedFieldIds?.length || 0,
-                  resumeUploaded: response.resumeUpload?.uploaded || false,
-                  resumeName: response.resumeUpload?.fileName || "",
-                  corrections: response.corrections || [],
-                });
+          try {
+            if (chrome.scripting) {
+              const execResults = await chrome.scripting.executeScript({
+                target: { tabId: tab.id, allFrames: true },
+                func: async (mappingsArg, profileArg, resumeArg) => {
+                  if (typeof (window as any).__IHATEFORM_AUTOFILL__ === "function") {
+                    return await (window as any).__IHATEFORM_AUTOFILL__(mappingsArg, profileArg, resumeArg);
+                  }
+                  return null;
+                },
+                args: [enrichedMappings, userProfile, savedResume],
+              });
 
-                if (response.corrections && response.corrections.length > 0) {
-                  setMappings((prev) =>
-                    prev.map((m) => {
-                      const corr = response.corrections.find((c: any) => c.fieldId === m.fieldId);
-                      if (corr) {
-                        return {
-                          ...m,
-                          valueToFill: corr.correctedValue,
-                          reason: `Auto-corrected (${corr.warningMessage})`,
-                        };
-                      }
-                      return m;
-                    })
-                  );
+              if (execResults && execResults.length > 0) {
+                for (const res of execResults) {
+                  if (res.result) {
+                    if (Array.isArray(res.result.filledFieldIds)) {
+                      totalFilled.push(...res.result.filledFieldIds);
+                    }
+                    if (Array.isArray(res.result.skippedFieldIds)) {
+                      totalSkipped.push(...res.result.skippedFieldIds);
+                    }
+                    if (Array.isArray(res.result.errors)) {
+                      allErrors.push(...res.result.errors);
+                    }
+                    if (Array.isArray(res.result.corrections)) {
+                      allCorrections.push(...res.result.corrections);
+                    }
+                    if (res.result.resumeUpload?.uploaded) {
+                      resumeUploaded = true;
+                      resumeName = res.result.resumeUpload.fileName || "";
+                    }
+                  }
                 }
-
-                if (response.errors) {
-                  setErrors(response.errors);
-                }
               }
-              setIsFilling(false);
             }
-          );
+          } catch (scriptErr) {
+            console.warn("Direct multi-frame autofill failed, using message fallback:", scriptErr);
+          }
+
+          if (totalFilled.length === 0 && totalSkipped.length === 0 && allErrors.length === 0) {
+            await new Promise<void>((resolve) => {
+              chrome.tabs.sendMessage(
+                tab.id!,
+                {
+                  type: "FILL_FIELDS",
+                  payload: { mappings: enrichedMappings, profile: userProfile, savedResume },
+                },
+                (response) => {
+                  if (!chrome.runtime.lastError && response) {
+                    totalFilled = response.filledFieldIds || [];
+                    totalSkipped = response.skippedFieldIds || [];
+                    allErrors = response.errors || [];
+                    allCorrections = response.corrections || [];
+                    resumeUploaded = response.resumeUpload?.uploaded || false;
+                    resumeName = response.resumeUpload?.fileName || "";
+                  }
+                  resolve();
+                }
+              );
+            });
+          }
+
+          setFillSummary({
+            filled: totalFilled.length,
+            skipped: totalSkipped.length,
+            resumeUploaded,
+            resumeName,
+            corrections: allCorrections,
+          });
+
+          if (allCorrections.length > 0) {
+            setMappings((prev) =>
+              prev.map((m) => {
+                const corr = allCorrections.find((c: any) => c.fieldId === m.fieldId);
+                if (corr) {
+                  return {
+                    ...m,
+                    valueToFill: corr.correctedValue,
+                    reason: `Auto-corrected (${corr.warningMessage})`,
+                  };
+                }
+                return m;
+              })
+            );
+          }
+
+          if (allErrors.length > 0) {
+            setErrors(allErrors);
+          }
+
+          setIsFilling(false);
         } else {
           setIsFilling(false);
         }
@@ -436,7 +582,7 @@ export const App: React.FC = () => {
             tab.id,
             {
               type: "UPLOAD_RESUME",
-              payload: { profile: userProfile },
+              payload: { profile: userProfile, savedResume },
             },
             (response) => {
               setIsUploadingResume(false);
@@ -465,9 +611,9 @@ export const App: React.FC = () => {
   // If loading auth
   if (authState.loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-400 p-6 text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-100 p-6 text-center">
         <RefreshCw className="w-6 h-6 animate-spin text-indigo-400 mb-3" />
-        <p className="text-xs">Connecting to I Hate Form...</p>
+        <p className="text-xs text-slate-400">Verifying session with I Hate Form...</p>
       </div>
     );
   }
@@ -475,16 +621,22 @@ export const App: React.FC = () => {
   // If NOT authenticated, show clean login instruction popup
   if (!authState.authenticated) {
     return (
-      <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 p-5 select-none justify-between">
+      <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 p-4 select-none">
         {/* Header */}
-        <header className="flex items-center gap-2 pb-4 border-b border-slate-800">
-          <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg border border-indigo-500/30">
-            <Sparkles className="w-5 h-5" />
+        <header className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg border border-indigo-500/30">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="font-bold text-sm tracking-tight text-white">I Hate Form</h1>
+              <p className="text-[10px] text-slate-400">AI Application Copilot</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-sm tracking-tight text-white">I Hate Form</h1>
-            <p className="text-xs text-slate-400">Account Setup Required</p>
-          </div>
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-950/60 text-rose-400 border border-rose-800/40 text-[10px] font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span>
+            Not Logged In
+          </span>
         </header>
 
         {/* Lock Screen Body */}
@@ -548,6 +700,10 @@ export const App: React.FC = () => {
 
   const iframeFieldsCount = fields.filter((f) => f.frameId > 0).length;
 
+  const activeResumeDisplayName = savedResume?.filename || (userProfile?.personal
+    ? `${userProfile.personal.firstName}_${userProfile.personal.lastName}_Resume.pdf`
+    : "Sanjeev_Kumar_Resume.pdf");
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 p-4 select-none">
       {/* Header */}
@@ -558,43 +714,43 @@ export const App: React.FC = () => {
           </div>
           <div>
             <h1 className="font-bold text-sm tracking-tight text-white">I Hate Form</h1>
-            <p className="text-[11px] text-slate-400 truncate max-w-[150px]">
+            <p className="text-[10px] text-slate-400">
               {authState.user?.name || authState.user?.email}
             </p>
           </div>
         </div>
         <button
           onClick={openDashboardProfile}
-          title="Edit Profile on Dashboard"
-          className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-400 border border-emerald-800/40 rounded-full text-xs font-medium transition cursor-pointer"
+          title="Open Dashboard & Manage Resumes"
+          className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-800/40 text-[10px] font-medium transition cursor-pointer"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
           Connected
         </button>
       </header>
 
-      {/* Action Bar */}
+      {/* Control Buttons */}
       <div className="grid grid-cols-2 gap-2 mt-3">
         <button
           onClick={handleScanForm}
           disabled={isScanning}
-          className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-slate-800 hover:bg-slate-700 active:scale-98 transition text-slate-100 rounded-lg text-xs font-medium border border-slate-700 disabled:opacity-50 shadow-sm cursor-pointer"
+          className="flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-800 hover:bg-slate-700 active:scale-98 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 transition cursor-pointer disabled:opacity-50"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? "animate-spin" : ""}`} />
-          {isScanning ? "Scanning..." : "Scan Fields"}
+          <Scan className={`w-3.5 h-3.5 ${isScanning ? "animate-spin text-indigo-400" : "text-slate-400"}`} />
+          <span>{isScanning ? "Scanning..." : "Scan Fields"}</span>
         </button>
 
         <button
           onClick={handleAutofill}
           disabled={isFilling || fields.length === 0}
-          className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:scale-98 transition text-white rounded-lg text-xs font-medium shadow-md shadow-indigo-950/50 disabled:opacity-50 cursor-pointer"
+          className="flex items-center justify-center gap-1.5 py-2 px-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:scale-98 text-white rounded-lg text-xs font-semibold shadow-md shadow-indigo-950/50 transition cursor-pointer disabled:opacity-50"
         >
-          <Play className="w-3.5 h-3.5 fill-current" />
-          {isFilling ? "Filling..." : "Autofill Valid"}
+          <Play className={`w-3.5 h-3.5 ${isFilling ? "animate-spin" : "fill-current"}`} />
+          <span>{isFilling ? "Autofilling..." : "Autofill Valid"}</span>
         </button>
       </div>
 
-      {/* Dedicated NVIDIA NIM AI Answer Generation Button */}
+      {/* NVIDIA NIM AI Generate Answers Button */}
       {fields.length > 0 && (
         <button
           onClick={() => handleGenerateAIAnswers()}
@@ -646,16 +802,19 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Resume PDF Auto-Upload Indicator (Only rendered when resume upload field is present on form) */}
+      {/* Resume PDF Auto-Upload Indicator */}
       {hasResumeField && (
         <div className="mt-2.5 p-2 bg-indigo-950/40 border border-indigo-800/40 rounded-lg text-xs flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-indigo-300 font-medium truncate flex-1">
             <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             <span className="truncate">
-              {userProfile?.personal
-                ? `${userProfile.personal.firstName}_${userProfile.personal.lastName}_Resume.pdf`
-                : "Sanjeev_Kumar_Resume.pdf"}
+              {activeResumeDisplayName}
             </span>
+            {savedResume && (
+              <span className="px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 text-[9px] font-bold shrink-0">
+                DB Resume
+              </span>
+            )}
           </div>
           <button
             onClick={handleUploadResumeOnly}

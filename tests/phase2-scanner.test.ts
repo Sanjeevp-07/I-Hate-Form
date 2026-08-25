@@ -87,4 +87,95 @@ describe("Phase 2 Acceptance: Multi-Frame & Deep Shadow DOM Scanner (§16)", () 
     expect(typeof result.fields[0].frameId).toBe("number");
     expect(result.isTopFrame).toBe(true);
   });
+
+  it("Fixture 6: Floating Window / Modal Dialog with uppercase sibling headers and icon wrappers (ERP Modal)", () => {
+    document.body.innerHTML = `
+      <div class="fixed inset-0 z-50 flex items-center justify-center modal-overlay" role="dialog" aria-modal="true">
+        <div class="floating-window bg-white rounded-xl shadow-2xl p-6">
+          <h2>Personal Details</h2>
+          <p>Share a few details and we'll keep you updated.</p>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="field-item">
+              <span class="text-xs uppercase font-bold text-gray-500">FULL NAME</span>
+              <div class="input-wrapper flex items-center border rounded">
+                <span class="icon">👤</span>
+                <input type="text" placeholder="Enter your full name" />
+              </div>
+            </div>
+
+            <div class="field-item">
+              <span class="text-xs uppercase font-bold text-gray-500">EMAIL ADDRESS</span>
+              <div class="input-wrapper flex items-center border rounded">
+                <span class="icon">✉️</span>
+                <input type="email" placeholder="you@example.com" />
+              </div>
+            </div>
+
+            <div class="field-item">
+              <span class="text-xs uppercase font-bold text-gray-500">MOBILE NUMBER</span>
+              <div class="input-wrapper flex items-center border rounded">
+                <span class="icon">📞</span>
+                <input type="tel" placeholder="Enter mobile number" />
+              </div>
+            </div>
+
+            <div class="field-item">
+              <span class="text-xs uppercase font-bold text-gray-500">COUNTRY</span>
+              <div class="input-wrapper flex items-center border rounded">
+                <span class="icon">🌐</span>
+                <input type="text" placeholder="Enter country" />
+              </div>
+            </div>
+
+            <div class="field-item">
+              <span class="text-xs uppercase font-bold text-gray-500">STATE</span>
+              <div class="input-wrapper flex items-center border rounded">
+                <span class="icon">🏛️</span>
+                <input type="text" placeholder="Enter state" />
+              </div>
+            </div>
+
+            <div class="field-item">
+              <span class="text-xs uppercase font-bold text-gray-500">CITY</span>
+              <div class="input-wrapper flex items-center border rounded">
+                <span class="icon">📍</span>
+                <input type="text" placeholder="Enter city" />
+              </div>
+            </div>
+
+            <div class="field-item">
+              <span class="text-xs uppercase font-bold text-gray-500">PASSWORD</span>
+              <div class="input-wrapper flex items-center border rounded">
+                <span class="icon">🔒</span>
+                <input type="password" placeholder="Create password" />
+              </div>
+            </div>
+
+            <div class="field-item">
+              <span class="text-xs uppercase font-bold text-gray-500">CONFIRM PASSWORD</span>
+              <div class="input-wrapper flex items-center border rounded">
+                <span class="icon">🔒</span>
+                <input type="password" placeholder="Confirm password" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const result = scanFormFieldsWithStats();
+    expect(result.fields).toHaveLength(8);
+
+    const labels = result.fields.map((f) => f.normalizedLabel);
+    expect(labels).toContain("full name");
+    expect(labels).toContain("email address");
+    expect(labels).toContain("mobile number");
+    expect(labels).toContain("country");
+    expect(labels).toContain("state");
+    expect(labels).toContain("city");
+    expect(labels).toContain("password");
+    expect(labels).toContain("confirm password");
+  });
 });
+

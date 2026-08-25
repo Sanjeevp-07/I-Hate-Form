@@ -16,8 +16,30 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
   const frameMeta = FrameRegistry.initialize();
   const currentFrameId = frameMeta.frameId;
 
+  // Expose global scanning and autofill helpers for direct scripting
+  (window as any).__IHATEFORM_SCAN_WITH_STATS__ = () => {
+    const scanStats = scanFormFieldsWithStats();
+    const resumeInputs = findResumeUploadInputs();
+    return {
+      frameId: currentFrameId,
+      fields: scanStats.fields,
+      closedShadowRootsDetected: scanStats.closedShadowRootsDetected,
+      hasResumeField: resumeInputs.length > 0,
+    };
+  };
+
+  (window as any).__IHATEFORM_AUTOFILL__ = async (mappings: any[], profile: any, savedResume: any) => {
+    const scanStats = scanFormFieldsWithStats();
+    return await executeAutofill(scanStats.fields, mappings, profile || null, savedResume || null);
+  };
+
   // Listen for messages from background worker / sidepanel
   chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
+    if (message.type === "PING") {
+      sendResponse({ pong: true, frameId: currentFrameId });
+      return true;
+    }
+
     if (message.type === "SCAN_FORM") {
       try {
         const scanStats = scanFormFieldsWithStats();
@@ -38,9 +60,14 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
     if (message.type === "FILL_FIELDS") {
       (async () => {
         try {
-          const payload = message.payload as FillFieldsPayload & { profile?: any };
+          const payload = message.payload as FillFieldsPayload & { profile?: any; savedResume?: any };
           const scanStats = scanFormFieldsWithStats();
-          const autofillResult = await executeAutofill(scanStats.fields, payload.mappings, payload.profile || null);
+          const autofillResult = await executeAutofill(
+            scanStats.fields,
+            payload.mappings,
+            payload.profile || null,
+            payload.savedResume || null
+          );
 
           const resultPayload: FillResultPayload & { resumeUpload?: any; corrections?: any } = {
             filledFieldIds: autofillResult.filledFieldIds,
@@ -63,8 +90,8 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
 
     if (message.type === "UPLOAD_RESUME") {
       try {
-        const payload = message.payload as { profile?: any };
-        const uploadResult = autoUploadResume(payload?.profile || null);
+        const payload = message.payload as { profile?: any; savedResume?: any };
+        const uploadResult = autoUploadResume(payload?.profile || null, payload?.savedResume || null);
         sendResponse({ success: uploadResult.uploaded, uploadResult });
       } catch (err) {
         sendResponse({ success: false, error: String(err) });

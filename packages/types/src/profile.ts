@@ -17,6 +17,7 @@ export interface PersonalInfo {
   gender?: string;
   veteranStatus?: string;
   disabilityStatus?: string;
+  password?: string;
 }
 
 export interface ProfileLinks {

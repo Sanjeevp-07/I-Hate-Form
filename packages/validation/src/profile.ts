@@ -15,6 +15,7 @@ export const personalInfoSchema = z.object({
   gender: z.string().optional(),
   veteranStatus: z.string().optional(),
   disabilityStatus: z.string().optional(),
+  password: z.string().optional(),
 });
 
 export const profileLinksSchema = z.object({

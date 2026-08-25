@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { FileText, Upload, Trash2, CheckCircle2, Star, AlertCircle, RefreshCw } from "lucide-react";
+import { FileText, Upload, Trash2, CheckCircle2, Star, AlertCircle, RefreshCw, Download, Sparkles } from "lucide-react";
 
 interface ResumeDoc {
   id: string;
@@ -40,29 +40,34 @@ export default function ResumesPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Check 10MB limit
+    if (file.size > 10 * 1024 * 1024) {
+      setMessage({ type: "error", text: "File is too large. Maximum allowed size is 10MB." });
+      return;
+    }
+
     setUploading(true);
     setMessage(null);
 
     try {
-      const payload = {
-        title: file.name,
-        filename: file.name,
-        sizeBytes: file.size,
-        mimeType: file.type || "application/pdf",
-        tags: [],
-      };
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("title", file.name);
 
       const res = await fetch("/api/documents", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       if (res.ok) {
-        setMessage({ type: "success", text: `"${file.name}" uploaded and parsed successfully!` });
+        setMessage({
+          type: "success",
+          text: `"${file.name}" uploaded successfully! It is now stored in your database and ready for Chrome Extension autofill.`,
+        });
         fetchDocuments();
       } else {
-        setMessage({ type: "error", text: "Failed to upload resume document." });
+        const data = await res.json();
+        setMessage({ type: "error", text: data.error || "Failed to upload resume document." });
       }
     } catch {
       setMessage({ type: "error", text: "Network error uploading file." });
@@ -79,7 +84,7 @@ export default function ResumesPage() {
         setDocuments((prev) =>
           prev.map((d) => ({ ...d, isPreferred: d.id === id }))
         );
-        setMessage({ type: "success", text: "Default resume updated for AI matching!" });
+        setMessage({ type: "success", text: "Default resume updated for Chrome Extension autofill and AI matching!" });
       }
     } catch {
       setMessage({ type: "error", text: "Failed to update default resume." });
@@ -93,7 +98,7 @@ export default function ResumesPage() {
       const res = await fetch(`/api/documents/${id}`, { method: "DELETE" });
       if (res.ok) {
         setDocuments((prev) => prev.filter((d) => d.id !== id));
-        setMessage({ type: "success", text: "Resume removed." });
+        setMessage({ type: "success", text: "Resume removed from database." });
       }
     } catch {
       setMessage({ type: "error", text: "Failed to delete resume." });
@@ -101,6 +106,7 @@ export default function ResumesPage() {
   };
 
   const formatFileSize = (bytes: number) => {
+    if (!bytes) return "0 B";
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -113,7 +119,7 @@ export default function ResumesPage() {
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">Documents & Resumes</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Upload tailored resumes to allow the AI Copilot to match and answer job questions with real experiences.
+            Store your real resumes in the database. The Chrome Extension will automatically attach your primary resume on job application forms.
           </p>
         </div>
 
@@ -122,7 +128,7 @@ export default function ResumesPage() {
             type="file"
             ref={fileInputRef}
             onChange={handleFileUpload}
-            accept=".pdf,.docx,.doc"
+            accept=".pdf,.docx,.doc,.txt"
             className="hidden"
           />
           <button
@@ -131,9 +137,17 @@ export default function ResumesPage() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white text-xs font-medium transition shadow-md shadow-indigo-950/50 cursor-pointer disabled:opacity-50"
           >
             {uploading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-            <span>{uploading ? "Uploading..." : "Upload Resume (PDF/DOCX)"}</span>
+            <span>{uploading ? "Storing in Database..." : "Upload Resume (PDF / DOCX)"}</span>
           </button>
         </div>
+      </div>
+
+      {/* Info Banner */}
+      <div className="p-3 bg-indigo-950/30 border border-indigo-800/40 rounded-xl text-xs flex items-center gap-2.5 text-indigo-300">
+        <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+        <span>
+          <strong>Autofill Sync:</strong> Your <strong>Default Resume</strong> is synchronized directly with the Chrome Extension. When an ATS or job portal has an upload field, this exact document will be uploaded.
+        </span>
       </div>
 
       {message && (
@@ -167,20 +181,20 @@ export default function ResumesPage() {
           ))}
         </div>
       ) : documents.length === 0 ? (
-        <div className="p-12 text-center border border-dashed border-slate-800 rounded-2xl space-y-3">
+        <div className="p-12 text-center border border-dashed border-slate-800 rounded-2xl space-y-3 bg-slate-900/30">
           <div className="p-3 bg-slate-900 w-12 h-12 rounded-full mx-auto flex items-center justify-center text-slate-500">
             <FileText className="w-6 h-6" />
           </div>
-          <div className="text-sm font-semibold text-white">No Resumes Uploaded</div>
+          <div className="text-sm font-semibold text-white">No Resumes Uploaded Yet</div>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Upload your resume so I Hate Form can draft tailored application answers.
+            Upload your resume so I Hate Form can store it in the database and automatically attach it to job application forms.
           </p>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5" />
-            Upload Now
+            Upload Resume Now
           </button>
         </div>
       ) : (
@@ -196,11 +210,11 @@ export default function ResumesPage() {
             >
               {/* Card Header */}
               <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div className={`p-2 rounded-lg ${doc.isPreferred ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30" : "bg-slate-800 text-slate-400"}`}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`p-2 rounded-lg shrink-0 ${doc.isPreferred ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30" : "bg-slate-800 text-slate-400"}`}>
                     <FileText className="w-5 h-5" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="text-xs font-semibold text-white truncate max-w-[220px]">
                       {doc.title}
                     </h3>
@@ -211,15 +225,15 @@ export default function ResumesPage() {
                 </div>
 
                 {doc.isPreferred ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 text-[10px] font-semibold">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 text-[10px] font-semibold shrink-0">
                     <Star className="w-3 h-3 fill-current" />
-                    Default AI Resume
+                    Default Resume
                   </span>
                 ) : (
                   <button
                     onClick={() => handleSetPreferred(doc.id)}
-                    title="Set as Default Resume for AI Matching"
-                    className="text-slate-500 hover:text-indigo-400 text-[11px] font-medium transition cursor-pointer"
+                    title="Set as Default Resume for Autofill"
+                    className="text-slate-400 hover:text-indigo-400 text-[11px] font-medium transition cursor-pointer shrink-0"
                   >
                     Set as Default
                   </button>
@@ -240,7 +254,15 @@ export default function ResumesPage() {
 
               {/* Actions Footer */}
               <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                <span className="text-[11px] text-slate-500">Ready for Autofill</span>
+                <a
+                  href={`/api/documents/${doc.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium transition"
+                >
+                  <Download className="w-3 h-3" />
+                  <span>Download / Preview</span>
+                </a>
                 <button
                   onClick={() => handleDelete(doc.id, doc.title)}
                   className="flex items-center gap-1 text-slate-500 hover:text-rose-400 transition text-[11px] cursor-pointer"

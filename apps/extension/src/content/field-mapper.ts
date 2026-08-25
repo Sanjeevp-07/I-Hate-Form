@@ -34,6 +34,12 @@ const DETERMINISTIC_RULES: RuleDefinition[] = [
     confidence: 0.98,
   },
   {
+    profilePath: "personal.email",
+    patterns: [/e[\s_-]?mail/i, /email[\s_-]?address/i, /email[\s_-]?id/i, /\bmail[\s_-]?id\b/i, /\be-mail\b/i, /\be[\s_-]?mail[\s_-]?address\b/i],
+    getValue: (p) => p.personal.email || null,
+    confidence: 0.99,
+  },
+  {
     profilePath: "personal.postalCode",
     patterns: [/pincode/i, /pin[\s_-]?code/i, /postal[\s_-]?code/i, /zip[\s_-]?code/i, /\bzip\b/i],
     getValue: (p) => p.personal.postalCode || null,
@@ -41,15 +47,9 @@ const DETERMINISTIC_RULES: RuleDefinition[] = [
   },
   {
     profilePath: "personal.address",
-    patterns: [/current[\s_-]?street/i, /locality/i, /area\b/i, /street[\s_-]?address/i, /address[\s_-]?1/i, /\baddress\b/i, /\baddr\b/i],
+    patterns: [/current[\s_-]?street/i, /locality/i, /area\b/i, /street[\s_-]?address/i, /address[\s_-]?1/i, /permanent[\s_-]?address/i, /home[\s_-]?address/i, /physical[\s_-]?address/i, /residential[\s_-]?address/i, /mailing[\s_-]?address/i, /^(\*|\s)*address(\*|\s)*$/i, /\b(street|home|physical|residential)[\s_-]?address\b/i, /^(\*|\s)*addr(\*|\s)*$/i],
     getValue: (p) => p.personal.address || null,
     confidence: 0.98,
-  },
-  {
-    profilePath: "personal.email",
-    patterns: [/e[\s_-]?mail/i, /email[\s_-]?address/i],
-    getValue: (p) => p.personal.email || null,
-    confidence: 0.99,
   },
   {
     profilePath: "personal.phone",
@@ -137,7 +137,50 @@ const DETERMINISTIC_RULES: RuleDefinition[] = [
     getValue: (p) => p.personal.requiresSponsorship ?? null,
     confidence: 0.95,
   },
+  {
+    profilePath: "work.experienceYears",
+    patterns: [/^(\*|\s)*years?(\*|\s)*$/i, /total[\s_-]?years/i, /experience[\s_-]?years/i, /work[\s_-]?exp.*years/i],
+    getValue: () => "0",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "work.experienceMonths",
+    patterns: [/^(\*|\s)*months?(\*|\s)*$/i, /experience[\s_-]?months/i, /work[\s_-]?exp.*months/i],
+    getValue: () => "0 months",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "work.currentCtc",
+    patterns: [/current[\s_-]?ctc/i, /present[\s_-]?ctc/i, /current[\s_-]?salary/i, /cost[\s_-]?to[\s_-]?company/i],
+    getValue: () => "0",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "work.expectedCtc",
+    patterns: [/expected[\s_-]?ctc/i, /desired[\s_-]?ctc/i, /expected[\s_-]?salary/i],
+    getValue: () => "3",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "work.noticePeriod",
+    patterns: [/notice[\s_-]?period/i, /availability[\s_-]?to[\s_-]?join/i, /joining[\s_-]?time/i],
+    getValue: () => "Immediate Joiner",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "personal.confirmPassword",
+    patterns: [/confirm[\s_-]?passwor/i, /re[\s_-]?enter[\s_-]?passwor/i, /repeat[\s_-]?passwor/i, /verify[\s_-]?passwor/i],
+    getValue: (p) => (p?.personal as any)?.password || "Password@12345",
+    confidence: 0.95,
+  },
+  {
+    profilePath: "personal.password",
+    patterns: [/create[\s_-]?passwor/i, /new[\s_-]?passwor/i, /^(\*|\s)*password(\*|\s)*$/i, /\bpassword\b/i],
+    getValue: (p) => (p?.personal as any)?.password || "Password@12345",
+    confidence: 0.95,
+  },
 ];
+
 
 export function mapFieldDeterministically(
   field: FieldDescriptor,
@@ -146,9 +189,30 @@ export function mapFieldDeterministically(
   const cleanLabel = (field.rawLabel || "").replace(/[*:]/g, " ").trim();
   const directLabel = `${cleanLabel} ${field.normalizedLabel || ""}`.trim();
   const fullContext = `${directLabel} ${field.name || ""} ${field.autocomplete || ""} ${field.nearbyText || ""}`.trim();
+  const isEmailContext = field.type === "email" || /e[\s_-]?mail/i.test(directLabel) || /e[\s_-]?mail/i.test(field.name || "") || field.autocomplete === "email";
+
+  // Fast path for explicit email type or label
+  if (isEmailContext) {
+    const val = profile ? profile.personal.email || null : null;
+    return {
+      fieldId: field.id,
+      rawLabel: field.rawLabel,
+      normalizedLabel: field.normalizedLabel,
+      profilePath: "personal.email",
+      valueToFill: val,
+      confidence: 0.99,
+      action: "fill",
+      source: "rule",
+      reason: "Matched explicit email field",
+    };
+  }
 
   // 1. First pass: Match directly against clean label & normalized label
   for (const rule of DETERMINISTIC_RULES) {
+    if (rule.profilePath === "personal.address" && isEmailContext) {
+      continue;
+    }
+
     for (const pattern of rule.patterns) {
       if (pattern.test(directLabel)) {
         const val = profile ? rule.getValue(profile) : null;
@@ -182,6 +246,10 @@ export function mapFieldDeterministically(
 
   // 2. Second pass: Match against full context (attributes, nearbyText)
   for (const rule of DETERMINISTIC_RULES) {
+    if (rule.profilePath === "personal.address" && isEmailContext) {
+      continue;
+    }
+
     for (const pattern of rule.patterns) {
       if (pattern.test(fullContext)) {
         const val = profile ? rule.getValue(profile) : null;

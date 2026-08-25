@@ -23,6 +23,7 @@ export interface StoredProfile {
     address?: string;
     requiresSponsorship?: boolean;
     authorizedInCountry?: boolean;
+    password?: string;
   };
   links: {
     linkedin?: string;
@@ -40,6 +41,8 @@ export interface StoredDocument {
   mimeType: string;
   tags: string[];
   isPreferred: boolean;
+  fileData?: string; // base64 string
+  filePath?: string;
   createdAt: string;
 }
 
@@ -222,23 +225,44 @@ export function getUserDocuments(userIdOrEmail: string): StoredDocument[] {
 
 export function addDocumentToUser(
   userIdOrEmail: string,
-  doc: { title: string; filename: string; sizeBytes: number; mimeType: string; tags: string[]; fileBufferBase64?: string }
+  doc: { title: string; filename: string; sizeBytes: number; mimeType: string; tags: string[]; fileBufferBase64?: string; fileData?: string }
 ): StoredDocument {
+  ensureDataDirs();
   const db = readDatabase();
   let user = db.users[userIdOrEmail] || Object.values(db.users).find((u) => u.email.toLowerCase() === userIdOrEmail.toLowerCase());
   if (!user) user = getOrCreateUser(userIdOrEmail);
 
   if (!user.documents) user.documents = [];
 
+  const docId = "doc_" + Math.random().toString(36).substring(2, 9);
+  const base64Data = doc.fileData || doc.fileBufferBase64 || "";
+
+  // Optionally persist physical file to disk
+  let savedFilePath: string | undefined = undefined;
+  if (base64Data) {
+    try {
+      const sanitizedName = doc.filename.replace(/[^a-zA-Z0-9_.-]/g, "_");
+      savedFilePath = path.join(DOCS_DIR, `${docId}_${sanitizedName}`);
+      fs.writeFileSync(savedFilePath, Buffer.from(base64Data, "base64"));
+    } catch (e) {
+      console.warn("Could not write document to disk:", e);
+    }
+  }
+
+  // If this is the first document, make it preferred. Otherwise if any is preferred, keep it.
+  const hasPreferred = user.documents.some((d) => d.isPreferred);
+
   const newDoc: StoredDocument = {
-    id: "doc_" + Math.random().toString(36).substring(2, 9),
+    id: docId,
     userId: user.id,
     title: doc.title,
     filename: doc.filename,
     sizeBytes: doc.sizeBytes,
     mimeType: doc.mimeType,
     tags: doc.tags.length > 0 ? doc.tags : ["Resume", "Software Engineering"],
-    isPreferred: user.documents.length === 0,
+    isPreferred: !hasPreferred,
+    fileData: base64Data || undefined,
+    filePath: savedFilePath,
     createdAt: new Date().toISOString(),
   };
 
@@ -247,12 +271,33 @@ export function addDocumentToUser(
   return newDoc;
 }
 
+export function getPreferredDocument(userIdOrEmail: string): StoredDocument | null {
+  const docs = getUserDocuments(userIdOrEmail);
+  if (docs.length === 0) return null;
+  const preferred = docs.find((d) => d.isPreferred);
+  return preferred || docs[0] || null;
+}
+
+export function getDocumentById(userIdOrEmail: string, docId: string): StoredDocument | null {
+  const docs = getUserDocuments(userIdOrEmail);
+  return docs.find((d) => d.id === docId) || null;
+}
+
 export function deleteUserDocument(userIdOrEmail: string, docId: string): boolean {
   const db = readDatabase();
   const user = db.users[userIdOrEmail] || Object.values(db.users).find((u) => u.email.toLowerCase() === userIdOrEmail.toLowerCase());
   if (!user || !user.documents) return false;
 
   const initialLen = user.documents.length;
+  const targetDoc = user.documents.find((d) => d.id === docId);
+
+  // Remove physical file from disk if present
+  if (targetDoc?.filePath && fs.existsSync(targetDoc.filePath)) {
+    try {
+      fs.unlinkSync(targetDoc.filePath);
+    } catch {}
+  }
+
   user.documents = user.documents.filter((d) => d.id !== docId);
 
   if (user.documents.length < initialLen) {
@@ -277,3 +322,4 @@ export function setPreferredDocument(userIdOrEmail: string, docId: string): bool
   writeDatabase(db);
   return true;
 }
+

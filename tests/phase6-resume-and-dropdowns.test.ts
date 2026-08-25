@@ -162,6 +162,43 @@ describe("Phase 6: Country Mapping, Dropdown Autofill & Resume PDF Auto-Upload",
     expect(result.elementCount).toBe(0);
   });
 
+  it("Detects and auto-uploads Resume PDF to custom ATS stylized upload containers (hidden file input with Upload Resume button)", () => {
+    document.body.innerHTML = `
+      <div class="resume-section">
+        <p>*Make completing your job application easier by uploading your resume or CV.</p>
+        <p>Upload either DOC, DOCX, PDF or TXT file types (3MB max)</p>
+        <input type="file" id="resume_hidden_input" name="resumeFile" style="display:none;" accept=".doc,.docx,.pdf,.txt" />
+        <button type="button" class="btn btn-primary">Upload Resume</button>
+      </div>
+    `;
+
+    const result = autoUploadResume(mockProfile);
+
+    expect(result.detected).toBe(true);
+    expect(result.uploaded).toBe(true);
+    expect(result.fileName).toContain("Sanjeev_Kumar_Resume.pdf");
+
+    const input = document.getElementById("resume_hidden_input") as HTMLInputElement;
+    expect(input.files).not.toBeNull();
+    expect(input.files?.length).toBe(1);
+    expect(input.files?.[0].name).toBe("Sanjeev_Kumar_Resume.pdf");
+  });
+
+  it("Detects and auto-uploads Resume PDF to dropzone upload containers", () => {
+    document.body.innerHTML = `
+      <div class="dropzone file-drop-area">
+        <span class="choose-file-button">Upload or drag & drop your CV / Resume</span>
+        <input type="file" class="file-input" name="cv_attachment" accept="application/pdf,application/msword" />
+      </div>
+    `;
+
+    const result = autoUploadResume(mockProfile);
+
+    expect(result.detected).toBe(true);
+    expect(result.uploaded).toBe(true);
+    expect(result.fileName).toContain("Sanjeev_Kumar_Resume.pdf");
+  });
+
   it("Does NOT upload resume to generic non-document file inputs (e.g. photo avatar uploaders)", () => {
     document.body.innerHTML = `
       <form id="profile-pic-form">

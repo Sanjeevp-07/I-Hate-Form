@@ -1,6 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
-import { deleteUserDocument, setPreferredDocument } from "@internship-copilot/database";
+import { deleteUserDocument, setPreferredDocument, getDocumentById } from "@internship-copilot/database";
+import fs from "fs";
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const sessionUser = await getAuthenticatedUser(req);
+    const userIdOrEmail = sessionUser?.id || sessionUser?.email || "sanjeev1803t@gmail.com";
+
+    const doc = getDocumentById(userIdOrEmail, id);
+    if (!doc) {
+      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+    }
+
+    if (doc.fileData) {
+      const buffer = Buffer.from(doc.fileData, "base64");
+      return new NextResponse(buffer, {
+        headers: {
+          "Content-Type": doc.mimeType || "application/pdf",
+          "Content-Disposition": `inline; filename="${doc.filename}"`,
+        },
+      });
+    }
+
+    if (doc.filePath && fs.existsSync(doc.filePath)) {
+      const fileBuffer = fs.readFileSync(doc.filePath);
+      return new NextResponse(fileBuffer, {
+        headers: {
+          "Content-Type": doc.mimeType || "application/pdf",
+          "Content-Disposition": `inline; filename="${doc.filename}"`,
+        },
+      });
+    }
+
+    return NextResponse.json({ document: doc });
+  } catch (err) {
+    return NextResponse.json({ error: "Failed to load document" }, { status: 500 });
+  }
+}
 
 export async function DELETE(
   req: NextRequest,
@@ -9,7 +50,7 @@ export async function DELETE(
   try {
     const { id } = await params;
     const sessionUser = await getAuthenticatedUser(req);
-    const userIdOrEmail = sessionUser?.id || sessionUser?.email || "user_admin";
+    const userIdOrEmail = sessionUser?.id || sessionUser?.email || "sanjeev1803t@gmail.com";
 
     const deleted = deleteUserDocument(userIdOrEmail, id);
     if (!deleted) {
@@ -29,7 +70,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const sessionUser = await getAuthenticatedUser(req);
-    const userIdOrEmail = sessionUser?.id || sessionUser?.email || "user_admin";
+    const userIdOrEmail = sessionUser?.id || sessionUser?.email || "sanjeev1803t@gmail.com";
 
     const updated = setPreferredDocument(userIdOrEmail, id);
     if (!updated) {

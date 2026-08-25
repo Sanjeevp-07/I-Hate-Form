@@ -5,7 +5,7 @@ import { getUserDocuments, addDocumentToUser } from "@internship-copilot/databas
 export async function GET(req: NextRequest) {
   try {
     const sessionUser = await getAuthenticatedUser(req);
-    const userIdOrEmail = sessionUser?.id || sessionUser?.email || "user_admin";
+    const userIdOrEmail = sessionUser?.id || sessionUser?.email || "sanjeev1803t@gmail.com";
 
     const documents = getUserDocuments(userIdOrEmail);
     return NextResponse.json({ documents });
@@ -17,10 +17,49 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const sessionUser = await getAuthenticatedUser(req);
-    const userIdOrEmail = sessionUser?.id || sessionUser?.email || "user_admin";
+    const userIdOrEmail = sessionUser?.id || sessionUser?.email || "sanjeev1803t@gmail.com";
 
-    const body = await req.json();
-    const { title, filename, sizeBytes, mimeType, tags } = body;
+    const contentType = req.headers.get("content-type") || "";
+
+    let title = "";
+    let filename = "";
+    let sizeBytes = 0;
+    let mimeType = "application/pdf";
+    let tags: string[] = [];
+    let fileData: string | undefined = undefined;
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData();
+      const file = formData.get("file") as File | null;
+      if (!file) {
+        return NextResponse.json({ error: "No file provided in form data" }, { status: 400 });
+      }
+
+      filename = file.name;
+      title = (formData.get("title") as string) || file.name;
+      sizeBytes = file.size;
+      mimeType = file.type || "application/pdf";
+
+      const rawTags = formData.get("tags") as string | null;
+      if (rawTags) {
+        try {
+          tags = JSON.parse(rawTags);
+        } catch {
+          tags = rawTags.split(",").map((t) => t.trim()).filter(Boolean);
+        }
+      }
+
+      const buffer = await file.arrayBuffer();
+      fileData = Buffer.from(buffer).toString("base64");
+    } else {
+      const body = await req.json();
+      title = body.title || body.filename || "";
+      filename = body.filename || "";
+      sizeBytes = body.sizeBytes || 0;
+      mimeType = body.mimeType || "application/pdf";
+      tags = body.tags || [];
+      fileData = body.fileData || body.fileBufferBase64;
+    }
 
     if (!filename) {
       return NextResponse.json({ error: "Filename is required" }, { status: 400 });
@@ -39,11 +78,13 @@ export async function POST(req: NextRequest) {
       filename,
       sizeBytes: sizeBytes || 250000,
       mimeType: mimeType || "application/pdf",
-      tags: extractedTags,
+      tags: Array.from(new Set(extractedTags)),
+      fileData,
     });
 
     return NextResponse.json({ success: true, document: newDoc }, { status: 201 });
   } catch (err) {
+    console.error("Document upload error:", err);
     return NextResponse.json({ error: "Failed to upload document" }, { status: 500 });
   }
 }

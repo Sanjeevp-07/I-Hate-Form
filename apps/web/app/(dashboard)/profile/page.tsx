@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { User, Mail, Phone, MapPin, Globe, Save, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { User, Mail, Phone, MapPin, Globe, Save, CheckCircle2, AlertCircle, RefreshCw, KeyRound, Eye, EyeOff, Lock } from "lucide-react";
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [form, setForm] = useState({
@@ -23,6 +24,7 @@ export default function ProfilePage() {
     city: "",
     postalCode: "",
     address: "",
+    password: "",
     requiresSponsorship: false,
     authorizedInCountry: true,
     linkedin: "",
@@ -52,6 +54,7 @@ export default function ProfilePage() {
             city: p.city || "",
             postalCode: p.postalCode || "",
             address: p.address || "",
+            password: p.password || "Password@12345",
             requiresSponsorship: !!p.requiresSponsorship,
             authorizedInCountry: p.authorizedInCountry !== false,
             linkedin: l.linkedin || "",
@@ -96,6 +99,7 @@ export default function ProfilePage() {
           city: form.city,
           postalCode: form.postalCode,
           address: form.address,
+          password: form.password,
           requiresSponsorship: form.requiresSponsorship,
           authorizedInCountry: form.authorizedInCountry,
         },
@@ -310,6 +314,48 @@ export default function ProfilePage() {
               placeholder="e.g. Indian"
               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Form Password AutoFill Card */}
+      <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2 text-xs font-semibold text-white">
+            <Lock className="w-4 h-4 text-amber-400" />
+            <span>Form Autofill Password</span>
+          </div>
+          <span className="text-[10px] text-amber-400/90 font-medium px-2 py-0.5 rounded bg-amber-950/40 border border-amber-800/50">
+            Used for all website registrations
+          </span>
+        </div>
+
+        <div className="text-xs space-y-3">
+          <p className="text-slate-400 text-xs">
+            This default password will automatically be filled whenever an application form, portal, or website asks you to <strong className="text-slate-300">Create a Password</strong> or <strong className="text-slate-300">Confirm Password</strong>.
+          </p>
+
+          <div className="relative max-w-md">
+            <label className="block text-slate-400 mb-1">Default Password *</label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="e.g. Password@12345"
+                required
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-3 pr-10 py-2 text-white focus:outline-none focus:border-amber-500 font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         </div>
       </div>

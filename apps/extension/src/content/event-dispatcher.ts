@@ -59,15 +59,37 @@ export function setNativeValue(
           element.value = expectedValue;
         }
 
+        try {
+          element.setAttribute("value", expectedValue);
+        } catch {}
+
         // Notify React's synthetic event system tracker if present
         const tracker = (element as any)._valueTracker;
         if (tracker && typeof tracker.setValue === "function") {
           tracker.setValue("");
         }
 
+        // Invoke React internal onChange/onInput handler if present on fiber
+        try {
+          const reactKey = Object.keys(element).find(
+            (k) => k.startsWith("__reactProps$") || k.startsWith("__reactEvents$") || k.startsWith("__reactFiber$")
+          );
+          if (reactKey) {
+            const reactProps = (element as any)[reactKey];
+            if (reactProps) {
+              if (typeof reactProps.onChange === "function") {
+                reactProps.onChange({ target: element, currentTarget: element, type: "change", bubbles: true });
+              }
+              if (typeof reactProps.onInput === "function") {
+                reactProps.onInput({ target: element, currentTarget: element, type: "input", bubbles: true });
+              }
+            }
+          }
+        } catch {}
+
         // Check for combobox / custom dropdown parent container and sibling elements
         const parentContainer = element.closest(
-          'div[class*="select"], div[class*="dropdown"], div[class*="combobox"], .form-group, .field-wrapper, .custom-select, div[class*="input"], div[class*="field"]'
+          'div[class*="select"], div[class*="dropdown"], div[class*="combobox"], .form-group, .field-wrapper, .custom-select, div[class*="input"], div[class*="field"], div[class*="form-group"]'
         );
         if (parentContainer) {
           const hiddenSelect = parentContainer.querySelector("select");
@@ -93,6 +115,10 @@ export function setNativeValue(
       } else {
         element.value = expectedValue;
       }
+
+      try {
+        element.setAttribute("value", expectedValue);
+      } catch {}
 
       // Notify React's synthetic event system tracker if present
       const tracker = (element as any)._valueTracker;
@@ -145,6 +171,21 @@ export function setNativeValue(
         if (tracker && typeof tracker.setValue === "function") {
           tracker.setValue("");
         }
+
+        // Invoke React internal onChange on select fiber
+        try {
+          const reactKey = Object.keys(element).find(
+            (k) => k.startsWith("__reactProps$") || k.startsWith("__reactEvents$") || k.startsWith("__reactFiber$")
+          );
+          if (reactKey) {
+            const reactProps = (element as any)[reactKey];
+            if (reactProps) {
+              if (typeof reactProps.onChange === "function") {
+                reactProps.onChange({ target: element, currentTarget: element, type: "change", bubbles: true });
+              }
+            }
+          }
+        } catch {}
       } else {
         selectMatched = false;
         expectedValue = String(value);
@@ -153,6 +194,7 @@ export function setNativeValue(
 
     // Dispatch full bubbling & composed event pipeline
     try {
+      element.dispatchEvent(new FocusEvent("focusin", { bubbles: true, composed: true }));
       element.dispatchEvent(new FocusEvent("focus", { bubbles: true, composed: true }));
 
       if (element instanceof HTMLSelectElement) {
@@ -162,6 +204,7 @@ export function setNativeValue(
         element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
         element.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
         element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+        element.dispatchEvent(new CustomEvent("ngModelChange", { bubbles: true, detail: expectedValue }));
 
         const selOption = element.options[element.selectedIndex];
         if (selOption) {
@@ -172,9 +215,9 @@ export function setNativeValue(
           } catch {}
         }
 
-        // Update custom dropdown wrappers (e.g. Phenom People / custom styled select / Bootstrap)
+        // Update custom dropdown wrappers
         const parentContainer = element.closest(
-          'div[class*="select"], div[class*="dropdown"], div[class*="combobox"], .form-group, .field-wrapper, .custom-select, div[class*="input"], div[class*="field"]'
+          'div[class*="select"], div[class*="dropdown"], div[class*="combobox"], .form-group, .field-wrapper, .custom-select, div[class*="input"], div[class*="field"], div[class*="form-group"]'
         );
         if (parentContainer) {
           parentContainer.dispatchEvent(new Event("input", { bubbles: true }));
@@ -200,22 +243,36 @@ export function setNativeValue(
           }
         }
       } else {
-        // Dispatch InputEvent with insertText metadata for input/textarea
+        // Dispatch Keyboard & Input events for input/textarea
+        try {
+          const keyChar = expectedValue ? expectedValue[0] : "0";
+          element.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: keyChar }));
+          element.dispatchEvent(new KeyboardEvent("keypress", { bubbles: true, cancelable: true, key: keyChar }));
+        } catch {}
+
         const inputEvent = typeof InputEvent === "function"
           ? new InputEvent("input", {
               bubbles: true,
               composed: true,
+              cancelable: true,
               data: expectedValue,
               inputType: "insertText",
             })
           : new Event("input", { bubbles: true, composed: true });
 
         element.dispatchEvent(inputEvent);
+
+        try {
+          const keyChar = expectedValue ? expectedValue[0] : "0";
+          element.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, cancelable: true, key: keyChar }));
+        } catch {}
+
         element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+        element.dispatchEvent(new CustomEvent("ngModelChange", { bubbles: true, detail: expectedValue }));
 
         // Try clicking matching dropdown option item in DOM if popup is rendered
         const parentContainer = element.closest(
-          'div[class*="select"], div[class*="dropdown"], div[class*="combobox"], .form-group, .field-wrapper, .custom-select, div[class*="input"], div[class*="field"]'
+          'div[class*="select"], div[class*="dropdown"], div[class*="combobox"], .form-group, .field-wrapper, .custom-select, div[class*="input"], div[class*="field"], div[class*="form-group"]'
         );
         if (parentContainer) {
           const listItems = Array.from(
@@ -243,6 +300,24 @@ export function setNativeValue(
       } catch {}
 
       element.dispatchEvent(new FocusEvent("blur", { bubbles: true, composed: true }));
+      element.dispatchEvent(new FocusEvent("focusout", { bubbles: true, composed: true }));
+
+      // Clear any validation error classes or message nodes if a valid value is now set
+      if (expectedValue !== "") {
+        const parentField = element.closest('.form-group, .field-wrapper, div[class*="field"], div[class*="form-control"], div[class*="input"], div[class*="group"]') || element.parentElement;
+        if (parentField) {
+          parentField.classList.remove("has-error", "is-invalid", "invalid", "error");
+          element.classList.remove("is-invalid", "invalid", "error");
+          element.removeAttribute("aria-invalid");
+          const errorNodes = parentField.querySelectorAll('.help-block, .invalid-feedback, .error-message, [role="alert"], span[class*="error"], div[class*="error"]');
+          errorNodes.forEach((node) => {
+            const txt = (node.textContent || "").toLowerCase();
+            if (txt.includes("required") || txt.includes("property") || txt.includes("blank") || txt.includes("enter")) {
+              (node as HTMLElement).style.display = "none";
+            }
+          });
+        }
+      }
     } catch {
       return {
         success: false,

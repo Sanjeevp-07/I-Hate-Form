@@ -132,49 +132,102 @@ startxref
 }
 
 /**
- * Checks if a file upload element or its parent container is part of the currently visible active DOM tree
- * (returns false if the input or any of its ancestor containers is hidden in an inactive wizard tab / step).
+ * Checks if a file upload element is connected and not inside an inactive multi-step wizard step/tab.
+ * NOTE: Custom stylized upload buttons (like on JAKSON, Workday, Greenhouse) intentionally set
+ * display: none, opacity: 0, or aria-hidden: true on the native <input type="file"> itself.
+ * Therefore, we only reject when an outer multi-step wizard container is inactive/hidden.
  */
 export function isFileInputActive(element: HTMLInputElement): boolean {
   if (!element || !element.isConnected) return false;
 
-  // 1. Check if the element itself or any ancestor has hidden attributes or common hidden classes
-  if (
-    element.closest(
-      '[aria-hidden="true"], [hidden], .hidden, .hide, .d-none, .ng-hide, [style*="display: none"], [style*="display:none"], .tab-pane:not(.active), .step:not(.active), .wizard-pane:not(.active), .wizard-step:not(.active)'
-    )
-  ) {
-    return false;
-  }
+  // Check parent hierarchy to determine if element belongs to a hidden step/tab/container
+  let curr: HTMLElement | null = element.parentElement;
+  while (curr && curr !== document.body && curr !== document.documentElement) {
+    // 1. Direct computed style check
+    try {
+      const computed = window.getComputedStyle(curr);
+      if (computed.display === "none" || computed.visibility === "hidden" || computed.visibility === "collapse") {
+        return false;
+      }
+    } catch {}
 
-  // 2. Iterate up the ancestor tree all the way to documentElement and verify computed visibility
-  if (typeof window !== "undefined" && typeof window.getComputedStyle === "function") {
-    let curr: HTMLElement | null = element.parentElement;
-    while (curr && curr !== document.body && curr !== document.documentElement) {
-      try {
-        const style = window.getComputedStyle(curr);
-        if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
-          return false;
-        }
-        if (curr.hasAttribute("hidden") || curr.getAttribute("aria-hidden") === "true") {
-          return false;
-        }
-      } catch {}
-      curr = curr.parentElement;
+    // 2. Inline styles, attributes, and common framework hidden classes
+    const styleAttr = (curr.getAttribute("style") || "").replace(/\s/g, "").toLowerCase();
+    if (
+      curr.style.display === "none" ||
+      styleAttr.includes("display:none") ||
+      curr.getAttribute("aria-hidden") === "true" ||
+      curr.hasAttribute("hidden") ||
+      curr.classList.contains("d-none") ||
+      curr.classList.contains("hide") ||
+      curr.classList.contains("hidden") ||
+      curr.classList.contains("ng-hide") ||
+      curr.classList.contains("invisible")
+    ) {
+      return false;
     }
+
+    // 3. Step/Wizard/Tab container active states
+    const isStepOrTab =
+      curr.classList.contains("tab-pane") ||
+      curr.classList.contains("wizard-step") ||
+      curr.classList.contains("wizard-pane") ||
+      curr.classList.contains("step-pane") ||
+      curr.classList.contains("step") ||
+      curr.getAttribute("role") === "tabpanel" ||
+      curr.hasAttribute("data-step") ||
+      (curr.id && /step|wizard|tab|pane|page/i.test(curr.id)) ||
+      (typeof curr.className === "string" && /step|wizard|tab-pane|wizard-step|wizard-pane/i.test(curr.className));
+
+    if (isStepOrTab) {
+      const isActive =
+        curr.classList.contains("active") ||
+        curr.classList.contains("current") ||
+        curr.classList.contains("show");
+
+      // If active siblings exist in the same wizard/tabset and this step is not active
+      const activeSibling = curr.parentElement?.querySelector(
+        ".wizard-step.active, .tab-pane.active, .step.active, [data-step].active, .step-pane.active, .step.current"
+      );
+      if (activeSibling && !isActive) {
+        return false;
+      }
+    }
+
+    curr = curr.parentElement;
   }
 
   return true;
 }
 
+
 /**
- * Searches the DOM and all accessible shadow roots for Resume / CV file upload elements.
+ * Searches the DOM, accessible iframes, and all shadow roots for Resume / CV file upload inputs.
  */
 export function findResumeUploadInputs(): HTMLInputElement[] {
-  const allFileInputs = querySelectorAllDeep('input[type="file"]') as HTMLInputElement[];
-  const resumeInputs: HTMLInputElement[] = [];
+  // 1. Gather all file inputs from deep DOM & shadow roots
+  const allFileInputs: HTMLInputElement[] = querySelectorAllDeep('input[type="file"]') as HTMLInputElement[];
 
-  const resumeKeywords = /resume|cv\b|curriculum|biodata|profile[\s_-]?upload|attach[\s_-]?resume|upload[\s_-]?resume|upload[\s_-]?cv|upload[\s_-]?document|document/i;
+  // 2. Also search inside any accessible same-origin iframes
+  try {
+    const iframes = document.querySelectorAll("iframe");
+    iframes.forEach((iframe) => {
+      try {
+        if (iframe.contentDocument) {
+          const iframeInputs = iframe.contentDocument.querySelectorAll('input[type="file"]');
+          iframeInputs.forEach((inp) => {
+            if (inp instanceof HTMLInputElement && !allFileInputs.includes(inp)) {
+              allFileInputs.push(inp);
+            }
+          });
+        }
+      } catch {}
+    });
+  } catch {}
+
+  const resumeKeywords = /resume|cv\b|curriculum|biodata|profile[\s_-]?upload|attach[\s_-]?resume|upload[\s_-]?resume|upload[\s_-]?cv|upload[\s_-]?document|document|doc|docx|pdf|txt|file[\s_-]?upload|upload[\s_-]?either/i;
+
+  const resumeInputs: HTMLInputElement[] = [];
 
   for (const input of allFileInputs) {
     if (!isFileInputActive(input)) {
@@ -185,39 +238,81 @@ export function findResumeUploadInputs(): HTMLInputElement[] {
     const id = input.getAttribute("id") || "";
     const accept = (input.getAttribute("accept") || "").toLowerCase();
     const ariaLabel = input.getAttribute("aria-label") || "";
-    const parentText = (input.parentElement?.textContent || "").slice(0, 200);
+    const parentText = (input.parentElement?.textContent || "").slice(0, 300);
     const label = input.closest("label") || (input.id ? document.querySelector(`label[for="${input.id}"]`) : null);
-    const labelText = (label?.textContent || "").slice(0, 200);
-    const container = input.closest('form, section, div[class*="upload"], div[class*="resume"], div[class*="drop"], div[class*="file"]');
-    const containerText = (container?.textContent || "").slice(0, 300);
-    const dataAutomation = input.getAttribute("data-automation-id") || "";
+    const labelText = (label?.textContent || "").slice(0, 300);
+    const container = input.closest('form, section, div[class*="upload"], div[class*="resume"], div[class*="drop"], div[class*="file"], div[class*="card"], div[class*="container"]');
+    const containerText = (container?.textContent || "").slice(0, 500);
+    const dataAutomation = input.getAttribute("data-automation-id") || input.getAttribute("data-testid") || "";
 
     const textBlob = `${name} ${id} ${ariaLabel} ${labelText} ${parentText} ${containerText} ${dataAutomation}`.toLowerCase();
 
-    // Skip photo/avatar uploaders
-    const isImageOnly = (accept.includes("image") || accept.includes("png") || accept.includes("jpeg") || accept.includes("jpg")) && !accept.includes("pdf") && !accept.includes("doc");
-    const isAvatar = /avatar|photo|profile[\s_-]?pic|picture|selfie|headshot/i.test(textBlob);
+    // Skip avatar / profile picture inputs (e.g. image-only uploaders without document/pdf support)
+    const isImageOnly = (accept.includes("image") || accept.includes("png") || accept.includes("jpeg") || accept.includes("jpg")) &&
+      !accept.includes("pdf") && !accept.includes("doc") && !accept.includes("docx") && !accept.includes("txt");
+    const isAvatar = /avatar|photo|profile[\s_-]?pic|picture|selfie|headshot/i.test(name || id || ariaLabel);
     if (isImageOnly || isAvatar) {
       continue;
     }
 
-    const isPdfAccept = accept.includes("pdf") || accept.includes("doc") || accept.includes("docx") || accept === "" || accept.includes("*");
+    const isPdfAccept = accept.includes("pdf") || accept.includes("doc") || accept.includes("docx") || accept.includes("txt");
     const matchesResumeKeyword = resumeKeywords.test(textBlob);
 
-    // If accept matches or text matches or it is the primary file input on the active form
-    if (matchesResumeKeyword || isPdfAccept) {
-      resumeInputs.push(input);
+    // Only match if explicitly matches resume keyword OR accepts pdf/doc with relevant document text
+    if (matchesResumeKeyword || (isPdfAccept && (textBlob.includes("upload") || textBlob.includes("attach") || textBlob.includes("file") || textBlob.includes("document")))) {
+      if (!resumeInputs.includes(input)) {
+        resumeInputs.push(input);
+      }
+    }
+  }
+
+  // 3. Fallback: search for custom "Upload Resume" / "Upload CV" buttons that trigger hidden inputs
+  if (resumeInputs.length === 0) {
+    const uploadButtons = Array.from(
+      document.querySelectorAll('button, a, div[role="button"], span[role="button"], label, div[class*="upload"], div[class*="dropzone"]')
+    );
+
+    for (const btn of uploadButtons) {
+      // Must be visible
+      if (btn instanceof HTMLElement && (btn.offsetParent === null || window.getComputedStyle(btn).display === "none")) {
+        continue;
+      }
+      const btnText = (btn.textContent || "").toLowerCase();
+      if (/upload[\s_-]?resume|upload[\s_-]?cv|attach[\s_-]?resume|upload[\s_-]?either|resume[\s_-]?or[\s_-]?cv/i.test(btnText)) {
+        const parent = btn.closest('div, section, form') || btn.parentElement;
+        if (parent) {
+          const fileInput = parent.querySelector('input[type="file"]') as HTMLInputElement | null;
+          if (fileInput && isFileInputActive(fileInput) && !resumeInputs.includes(fileInput)) {
+            resumeInputs.push(fileInput);
+          }
+        }
+      }
     }
   }
 
   return resumeInputs;
 }
 
+
+
+export interface SavedResumeDoc {
+  id?: string;
+  title?: string;
+  filename: string;
+  sizeBytes?: number;
+  mimeType?: string;
+  fileData?: string; // base64
+}
+
 /**
  * Automatically uploads the user's Resume PDF to all detected file upload inputs.
- * Executes as the FIRST task before any field is filled.
+ * If a real saved resume from the database is provided, uploads that exact document.
+ * Otherwise, generates candidate details PDF on-the-fly.
  */
-export function autoUploadResume(profile: UserProfile | null): ResumeUploadResult {
+export function autoUploadResume(
+  profile: UserProfile | null,
+  savedResume?: SavedResumeDoc | null
+): ResumeUploadResult {
   const fileInputs = findResumeUploadInputs();
   if (fileInputs.length === 0) {
     return {
@@ -231,10 +326,29 @@ export function autoUploadResume(profile: UserProfile | null): ResumeUploadResul
 
   const firstName = profile?.personal?.firstName || "Sanjeev";
   const lastName = profile?.personal?.lastName || "Kumar";
-  const rawFileName = `${firstName}_${lastName}_Resume.pdf`.replace(/\s+/g, "_");
+  
+  let pdfBlob: Blob;
+  let rawFileName: string;
 
-  const pdfBlob = generateResumePdfBlob(profile);
-  const pdfFile = new File([pdfBlob], rawFileName, { type: "application/pdf" });
+  if (savedResume && savedResume.fileData) {
+    try {
+      const binaryString = atob(savedResume.fileData);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      pdfBlob = new Blob([bytes], { type: savedResume.mimeType || "application/pdf" });
+      rawFileName = savedResume.filename || `${firstName}_${lastName}_Resume.pdf`.replace(/\s+/g, "_");
+    } catch {
+      pdfBlob = generateResumePdfBlob(profile);
+      rawFileName = `${firstName}_${lastName}_Resume.pdf`.replace(/\s+/g, "_");
+    }
+  } else {
+    pdfBlob = generateResumePdfBlob(profile);
+    rawFileName = `${firstName}_${lastName}_Resume.pdf`.replace(/\s+/g, "_");
+  }
+
+  const pdfFile = new File([pdfBlob], rawFileName, { type: savedResume?.mimeType || "application/pdf" });
 
   let uploadedCount = 0;
 
@@ -262,7 +376,7 @@ export function autoUploadResume(profile: UserProfile | null): ResumeUploadResul
         }
       } catch {}
 
-      // Dispatch full bubbling events on input
+      // Dispatch full bubbling events on the input element
       input.dispatchEvent(new Event("focus", { bubbles: true }));
       input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
       input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
@@ -279,7 +393,7 @@ export function autoUploadResume(profile: UserProfile | null): ResumeUploadResul
           if (input.parentElement) {
             input.parentElement.dispatchEvent(dropEvent);
           }
-          const dropContainer = input.closest('div[class*="drop"], div[class*="upload"], label');
+          const dropContainer = input.closest('div[class*="drop"], div[class*="upload"], div[class*="resume"], label, form');
           if (dropContainer) {
             dropContainer.dispatchEvent(dropEvent);
           }
@@ -289,7 +403,16 @@ export function autoUploadResume(profile: UserProfile | null): ResumeUploadResul
       // Also trigger on closest label
       const label = input.closest("label") || (input.id ? document.querySelector(`label[for="${input.id}"]`) : null);
       if (label) {
-        label.dispatchEvent(new Event("change", { bubbles: true }));
+        label.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+      }
+
+      // Also notify any nearby "Upload Resume" buttons or drop targets
+      const container = input.closest('div, section, form');
+      if (container) {
+        const customBtn = container.querySelector('button, [role="button"]');
+        if (customBtn) {
+          customBtn.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+        }
       }
 
       input.dispatchEvent(new Event("blur", { bubbles: true }));
