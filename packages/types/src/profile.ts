@@ -1,4 +1,5 @@
 export interface PersonalInfo {
+  fullName?: string;
   firstName: string;
   middleName?: string;
   lastName: string;
@@ -26,6 +27,39 @@ export interface ProfileLinks {
   portfolio?: string;
   twitter?: string;
   other?: string[];
+}
+
+export interface CurrentCollegeEducation {
+  institution: string;
+  degree: string;
+  major: string;
+  specialization?: string;
+  currentYear?: string | number;
+  currentSemester?: string | number;
+  graduationYear: string | number;
+  cgpa: string | number;
+  cgpaScale?: string | number;
+}
+
+export interface SecondaryEducation {
+  percentageOrCgpa: string | number;
+  passingYear: string | number;
+  schoolName?: string;
+}
+
+export interface HigherSecondaryEducation {
+  percentageOrCgpa: string | number;
+  passingYear: string | number;
+  schoolName?: string;
+  stream?: string;
+}
+
+export interface ProfileDocuments {
+  resumeDocId?: string;
+  secondaryMarksheetDocId?: string;
+  higherSecondaryMarksheetDocId?: string;
+  collegeTranscriptDocId?: string;
+  coverLetterDocId?: string;
 }
 
 export interface EducationItem {
@@ -73,6 +107,11 @@ export interface UserProfile {
   personal: PersonalInfo;
   links: ProfileLinks;
   education: EducationItem[];
+  currentEducation?: CurrentCollegeEducation;
+  secondary?: SecondaryEducation;
+  higherSecondary?: HigherSecondaryEducation;
+  skillsList?: string[];
+  documents?: ProfileDocuments;
   experience: ExperienceItem[];
   projects: ProjectItem[];
   skills: SkillItem[];

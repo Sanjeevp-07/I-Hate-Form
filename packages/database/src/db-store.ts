@@ -7,6 +7,7 @@ const DOCS_DIR = path.join(DATA_DIR, "documents");
 
 export interface StoredProfile {
   personal: {
+    fullName?: string;
     firstName?: string;
     middleName?: string;
     lastName?: string;
@@ -25,10 +26,40 @@ export interface StoredProfile {
     authorizedInCountry?: boolean;
     password?: string;
   };
+  education?: {
+    institution?: string;
+    degree?: string;
+    major?: string;
+    specialization?: string;
+    currentYear?: string;
+    currentSemester?: string;
+    graduationYear?: string;
+    cgpa?: string;
+    cgpaScale?: string;
+  };
+  secondary?: {
+    percentageOrCgpa?: string;
+    passingYear?: string;
+    schoolName?: string;
+  };
+  higherSecondary?: {
+    percentageOrCgpa?: string;
+    passingYear?: string;
+    schoolName?: string;
+    stream?: string;
+  };
+  skills?: string[];
   links: {
     linkedin?: string;
     github?: string;
     portfolio?: string;
+  };
+  documents?: {
+    resumeDocId?: string;
+    secondaryMarksheetDocId?: string;
+    higherSecondaryMarksheetDocId?: string;
+    collegeTranscriptDocId?: string;
+    coverLetterDocId?: string;
   };
 }
 
@@ -39,6 +70,7 @@ export interface StoredDocument {
   filename: string;
   sizeBytes: number;
   mimeType: string;
+  category?: "resume" | "secondaryMarksheet" | "higherSecondaryMarksheet" | "collegeTranscript" | "coverLetter" | string;
   tags: string[];
   isPreferred: boolean;
   fileData?: string; // base64 string
@@ -105,6 +137,7 @@ export function readDatabase(): DatabaseData {
         updatedAt: "2026-08-23T07:39:20.817Z",
         profile: {
           personal: {
+            fullName: "Sanjeev Kumar",
             firstName: "Sanjeev",
             middleName: "",
             lastName: "Kumar",
@@ -122,11 +155,48 @@ export function readDatabase(): DatabaseData {
             requiresSponsorship: false,
             authorizedInCountry: true,
           },
+          education: {
+            institution: "Bennett University",
+            degree: "B.Tech",
+            major: "Computer Science and Engineering",
+            specialization: "Artificial Intelligence",
+            currentYear: "3rd Year",
+            currentSemester: "6th Semester",
+            graduationYear: "2026",
+            cgpa: "8.9",
+            cgpaScale: "10.0",
+          },
+          secondary: {
+            percentageOrCgpa: "92.4",
+            passingYear: "2020",
+            schoolName: "St. Xavier's High School",
+          },
+          higherSecondary: {
+            percentageOrCgpa: "94.8",
+            passingYear: "2022",
+            schoolName: "DPS International School",
+            stream: "Science (PCM)",
+          },
+          skills: [
+            "React",
+            "Next.js",
+            "TypeScript",
+            "Node.js",
+            "Python",
+            "Tailwind CSS",
+            "Docker",
+            "PostgreSQL",
+            "AI/ML",
+            "PyTorch",
+            "Git",
+            "REST APIs",
+          ],
           links: {
             linkedin: "https://www.linkedin.com/in/sanjeev-kumar-1803t/",
             github: "https://github.com/Sanjeevp-07",
             portfolio: "https://port-folio-three-olive.vercel.app/",
           },
+          documents: {},
         },
         documents: [],
         applications: [],
@@ -225,7 +295,16 @@ export function getUserDocuments(userIdOrEmail: string): StoredDocument[] {
 
 export function addDocumentToUser(
   userIdOrEmail: string,
-  doc: { title: string; filename: string; sizeBytes: number; mimeType: string; tags: string[]; fileBufferBase64?: string; fileData?: string }
+  doc: {
+    title: string;
+    filename: string;
+    sizeBytes: number;
+    mimeType: string;
+    tags: string[];
+    category?: string;
+    fileBufferBase64?: string;
+    fileData?: string;
+  }
 ): StoredDocument {
   ensureDataDirs();
   const db = readDatabase();
@@ -259,6 +338,7 @@ export function addDocumentToUser(
     filename: doc.filename,
     sizeBytes: doc.sizeBytes,
     mimeType: doc.mimeType,
+    category: doc.category || (doc.tags.includes("10th") ? "secondaryMarksheet" : doc.tags.includes("12th") ? "higherSecondaryMarksheet" : doc.tags.includes("Transcript") ? "collegeTranscript" : doc.tags.includes("Cover Letter") ? "coverLetter" : "resume"),
     tags: doc.tags.length > 0 ? doc.tags : ["Resume", "Software Engineering"],
     isPreferred: !hasPreferred,
     fileData: base64Data || undefined,
@@ -267,6 +347,16 @@ export function addDocumentToUser(
   };
 
   user.documents.push(newDoc);
+
+  // Link document in user profile if category matches
+  if (!user.profile) user.profile = { personal: {}, links: {} };
+  if (!user.profile.documents) user.profile.documents = {};
+  if (doc.category === "resume") user.profile.documents.resumeDocId = docId;
+  else if (doc.category === "secondaryMarksheet") user.profile.documents.secondaryMarksheetDocId = docId;
+  else if (doc.category === "higherSecondaryMarksheet") user.profile.documents.higherSecondaryMarksheetDocId = docId;
+  else if (doc.category === "collegeTranscript") user.profile.documents.collegeTranscriptDocId = docId;
+  else if (doc.category === "coverLetter") user.profile.documents.coverLetterDocId = docId;
+
   writeDatabase(db);
   return newDoc;
 }

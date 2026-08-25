@@ -30,7 +30,8 @@ export async function executeAutofill(
   fields: FieldDescriptor[],
   mappings: FieldMapping[],
   profile: UserProfile | null = null,
-  savedResume?: SavedResumeDoc | null
+  savedResume?: SavedResumeDoc | null,
+  allDocuments?: SavedResumeDoc[] | null
 ): Promise<AutofillResult> {
   const result: AutofillResult = {
     filledFieldIds: [],
@@ -39,12 +40,12 @@ export async function executeAutofill(
     corrections: [],
   };
 
-  // STEP 1: Scan and upload Resume PDF as the VERY FIRST task before filling any field
+  // STEP 1: Scan and upload Resume / Marksheets / Transcripts / Docs as the VERY FIRST task before filling any field
   try {
-    const resumeRes = autoUploadResume(profile, savedResume);
+    const resumeRes = autoUploadResume(profile, savedResume, allDocuments);
     result.resumeUpload = resumeRes;
   } catch (err) {
-    console.warn("Resume auto-upload encountered an error:", err);
+    console.warn("Document auto-upload encountered an error:", err);
   }
 
   // STEP 2: Sort mappings so primary country/dial fields fill before dependent state/nationality fields

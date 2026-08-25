@@ -39,8 +39,11 @@ export const App: React.FC = () => {
     filename: string;
     fileData?: string;
     mimeType?: string;
+    category?: string;
     sizeBytes?: number;
   } | null>(null);
+
+  const [allUserDocs, setAllUserDocs] = useState<any[]>([]);
 
   // Check authentication status and fetch user profile
   const checkAuthAndFetchProfile = async () => {
@@ -68,17 +71,20 @@ export const App: React.FC = () => {
             setUserProfile(profData.profile || null);
           }
 
-          // 2. Fetch preferred resume stored in the database
+          // 2. Fetch all documents & preferred resume stored in the database
           try {
-            const resumeRes = await fetch(`${BACKEND_BASE_URL}/api/documents/preferred`, {
+            const docsRes = await fetch(`${BACKEND_BASE_URL}/api/documents`, {
               credentials: "include",
             });
-            if (resumeRes.ok) {
-              const resumeData = await resumeRes.json();
-              setSavedResume(resumeData.document || null);
+            if (docsRes.ok) {
+              const docsData = await docsRes.json();
+              const docsList = docsData.documents || [];
+              setAllUserDocs(docsList);
+              const preferred = docsList.find((d: any) => d.isPreferred) || docsList[0] || null;
+              setSavedResume(preferred);
             }
           } catch (e) {
-            console.warn("Could not fetch preferred resume:", e);
+            console.warn("Could not fetch documents:", e);
           }
 
           return;
@@ -173,6 +179,46 @@ export const App: React.FC = () => {
         return links.github || null;
       case "links.portfolio":
         return links.portfolio || null;
+      case "education.institution":
+        return (userProfile as any)?.education?.institution || (userProfile as any)?.currentEducation?.institution || null;
+      case "education.degree":
+        return (userProfile as any)?.education?.degree || (userProfile as any)?.currentEducation?.degree || "B.Tech";
+      case "education.major":
+        return (userProfile as any)?.education?.major || (userProfile as any)?.currentEducation?.major || "Computer Science and Engineering";
+      case "education.specialization":
+        return (userProfile as any)?.education?.specialization || (userProfile as any)?.currentEducation?.specialization || "Artificial Intelligence";
+      case "education.currentYear":
+        return (userProfile as any)?.education?.currentYear ? String((userProfile as any).education.currentYear) : "3rd Year";
+      case "education.currentSemester":
+        return (userProfile as any)?.education?.currentSemester ? String((userProfile as any).education.currentSemester) : "6th Semester";
+      case "education.graduationYear":
+        return (userProfile as any)?.education?.graduationYear ? String((userProfile as any).education.graduationYear) : "2026";
+      case "education.cgpa":
+        return (userProfile as any)?.education?.cgpa ? String((userProfile as any).education.cgpa) : "8.9";
+      case "education.cgpaScale":
+        return (userProfile as any)?.education?.cgpaScale ? String((userProfile as any).education.cgpaScale) : "10.0";
+      case "secondary.percentageOrCgpa":
+        return (userProfile as any)?.secondary?.percentageOrCgpa ? String((userProfile as any).secondary.percentageOrCgpa) : "92.4";
+      case "secondary.passingYear":
+        return (userProfile as any)?.secondary?.passingYear ? String((userProfile as any).secondary.passingYear) : "2020";
+      case "secondary.schoolName":
+        return (userProfile as any)?.secondary?.schoolName || "St. Xavier's High School";
+      case "higherSecondary.percentageOrCgpa":
+        return (userProfile as any)?.higherSecondary?.percentageOrCgpa ? String((userProfile as any).higherSecondary.percentageOrCgpa) : "94.8";
+      case "higherSecondary.passingYear":
+        return (userProfile as any)?.higherSecondary?.passingYear ? String((userProfile as any).higherSecondary.passingYear) : "2022";
+      case "higherSecondary.schoolName":
+        return (userProfile as any)?.higherSecondary?.schoolName || "DPS International School";
+      case "higherSecondary.stream":
+        return (userProfile as any)?.higherSecondary?.stream || "Science (PCM)";
+      case "skills":
+        if (Array.isArray((userProfile as any)?.skills)) {
+          return (userProfile as any).skills.join(", ");
+        }
+        if (Array.isArray((userProfile as any)?.skillsList)) {
+          return (userProfile as any).skillsList.join(", ");
+        }
+        return "React, TypeScript, Next.js, Python, Node.js, Tailwind CSS, Docker, PostgreSQL";
       case "work.experienceYears":
         return "0";
       case "work.experienceMonths":
@@ -469,13 +515,13 @@ export const App: React.FC = () => {
             if (chrome.scripting) {
               const execResults = await chrome.scripting.executeScript({
                 target: { tabId: tab.id, allFrames: true },
-                func: async (mappingsArg, profileArg, resumeArg) => {
+                func: async (mappingsArg, profileArg, resumeArg, allDocsArg) => {
                   if (typeof (window as any).__IHATEFORM_AUTOFILL__ === "function") {
-                    return await (window as any).__IHATEFORM_AUTOFILL__(mappingsArg, profileArg, resumeArg);
+                    return await (window as any).__IHATEFORM_AUTOFILL__(mappingsArg, profileArg, resumeArg, allDocsArg);
                   }
                   return null;
                 },
-                args: [enrichedMappings, userProfile, savedResume],
+                args: [enrichedMappings, userProfile, savedResume, allUserDocs],
               });
 
               if (execResults && execResults.length > 0) {
@@ -511,7 +557,7 @@ export const App: React.FC = () => {
                 tab.id!,
                 {
                   type: "FILL_FIELDS",
-                  payload: { mappings: enrichedMappings, profile: userProfile, savedResume },
+                  payload: { mappings: enrichedMappings, profile: userProfile, savedResume, allDocuments: allUserDocs },
                 },
                 (response) => {
                   if (!chrome.runtime.lastError && response) {

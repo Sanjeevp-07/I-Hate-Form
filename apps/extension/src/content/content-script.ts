@@ -32,9 +32,9 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
     };
   };
 
-  (window as any).__IHATEFORM_AUTOFILL__ = async (mappings: any[], profile: any, savedResume: any) => {
+  (window as any).__IHATEFORM_AUTOFILL__ = async (mappings: any[], profile: any, savedResume: any, allDocuments: any) => {
     const scanStats = scanFormFieldsWithStats();
-    return await executeAutofill(scanStats.fields, mappings, profile || null, savedResume || null);
+    return await executeAutofill(scanStats.fields, mappings, profile || null, savedResume || null, allDocuments || null);
   };
 
   // Listen for messages from background worker / sidepanel
@@ -64,13 +64,14 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
     if (message.type === "FILL_FIELDS") {
       (async () => {
         try {
-          const payload = message.payload as FillFieldsPayload & { profile?: any; savedResume?: any };
+          const payload = message.payload as FillFieldsPayload & { profile?: any; savedResume?: any; allDocuments?: any };
           const scanStats = scanFormFieldsWithStats();
           const autofillResult = await executeAutofill(
             scanStats.fields,
             payload.mappings,
             payload.profile || null,
-            payload.savedResume || null
+            payload.savedResume || null,
+            payload.allDocuments || null
           );
 
           const resultPayload: FillResultPayload & { resumeUpload?: any; corrections?: any } = {
@@ -94,8 +95,8 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
 
     if (message.type === "UPLOAD_RESUME") {
       try {
-        const payload = message.payload as { profile?: any; savedResume?: any };
-        const uploadResult = autoUploadResume(payload?.profile || null, payload?.savedResume || null);
+        const payload = message.payload as { profile?: any; savedResume?: any; allDocuments?: any };
+        const uploadResult = autoUploadResume(payload?.profile || null, payload?.savedResume || null, payload?.allDocuments || null);
         sendResponse({ success: uploadResult.uploaded, uploadResult });
       } catch (err) {
         sendResponse({ success: false, error: String(err) });

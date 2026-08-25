@@ -1,14 +1,6 @@
 import { UserProfile } from "@internship-copilot/types";
 import { querySelectorAllDeep } from "./shadow-dom-walker";
 
-export interface ResumeUploadResult {
-  detected: boolean;
-  uploaded: boolean;
-  elementCount: number;
-  fileName: string;
-  fileSizeBytes: number;
-}
-
 /**
  * Builds a valid minimal PDF binary document in memory containing candidate details.
  */
@@ -201,14 +193,92 @@ export function isFileInputActive(element: HTMLInputElement): boolean {
 }
 
 
+export interface DocumentUploadResult {
+  detected: boolean;
+  uploaded: boolean;
+  elementCount: number;
+  fileName: string;
+  fileSizeBytes: number;
+  uploadedDocuments: Array<{
+    category: string;
+    fileName: string;
+    fieldLabel: string;
+  }>;
+}
+
+export interface SavedDocumentItem {
+  id?: string;
+  title?: string;
+  filename: string;
+  sizeBytes?: number;
+  mimeType?: string;
+  category?: string;
+  tags?: string[];
+  isPreferred?: boolean;
+  fileData?: string; // base64
+}
+
+export type ResumeUploadResult = DocumentUploadResult;
+export type SavedResumeDoc = SavedDocumentItem;
+
 /**
- * Searches the DOM, accessible iframes, and all shadow roots for Resume / CV file upload inputs.
+ * Classifies which document category a given file input element is asking for.
  */
-export function findResumeUploadInputs(): HTMLInputElement[] {
-  // 1. Gather all file inputs from deep DOM & shadow roots
+export function classifyFileInputCategory(input: HTMLInputElement): { category: string; label: string } {
+  const name = input.getAttribute("name") || "";
+  const id = input.getAttribute("id") || "";
+  const accept = (input.getAttribute("accept") || "").toLowerCase();
+  const ariaLabel = input.getAttribute("aria-label") || "";
+  const placeholder = input.getAttribute("placeholder") || "";
+  const parentText = (input.parentElement?.textContent || "").slice(0, 300);
+  const label = input.closest("label") || (input.id ? document.querySelector(`label[for="${input.id}"]`) : null);
+  const labelText = (label?.textContent || "").slice(0, 300);
+  const container = input.closest('form, section, div[class*="upload"], div[class*="field"], div[class*="drop"], div[class*="file"], div[class*="card"], div[class*="container"], tr, td');
+  const containerText = (container?.textContent || "").slice(0, 500);
+  const dataAutomation = input.getAttribute("data-automation-id") || input.getAttribute("data-testid") || "";
+
+  const textBlob = `${name} ${id} ${ariaLabel} ${placeholder} ${labelText} ${parentText} ${containerText} ${dataAutomation} ${accept}`.toLowerCase();
+  const directLabel = `${labelText || ariaLabel || name || id}`.trim();
+
+  // 1. 10th / Secondary Marksheet / Certificate
+  if (
+    /10th|secondary|matriculation|class[\s_-]?10|xth|high[\s_-]?school[\s_-]?(mark|cert|pass)/i.test(textBlob) &&
+    !/12th|higher[\s_-]?secondary|graduation|college/i.test(directLabel.toLowerCase())
+  ) {
+    return { category: "secondaryMarksheet", label: directLabel || "10th Marksheet" };
+  }
+
+  // 2. 12th / Higher Secondary Marksheet / Certificate
+  if (
+    /12th|higher[\s_-]?secondary|intermediate|class[\s_-]?12|xiith|hsc|senior[\s_-]?secondary/i.test(textBlob)
+  ) {
+    return { category: "higherSecondaryMarksheet", label: directLabel || "12th Marksheet" };
+  }
+
+  // 3. College Transcript / Marksheets / Degree Certificate
+  if (
+    /transcript|college[\s_-]?marksheet|semester[\s_-]?marksheet|grade[\s_-]?card|university[\s_-]?marksheet|degree[\s_-]?cert|consolidated[\s_-]?marksheet|academic[\s_-]?record/i.test(textBlob)
+  ) {
+    return { category: "collegeTranscript", label: directLabel || "College Transcript" };
+  }
+
+  // 4. Cover Letter / Statement of Purpose
+  if (
+    /cover[\s_-]?letter|statement[\s_-]?of[\s_-]?purpose|\bsop\b|letter[\s_-]?of[\s_-]?intent|motivation[\s_-]?letter/i.test(textBlob)
+  ) {
+    return { category: "coverLetter", label: directLabel || "Cover Letter" };
+  }
+
+  // 5. Default / Primary: Resume / CV
+  return { category: "resume", label: directLabel || "Resume / CV" };
+}
+
+/**
+ * Searches the DOM, accessible iframes, and all shadow roots for document file upload inputs.
+ */
+export function findDocumentUploadInputs(): Array<{ input: HTMLInputElement; category: string; label: string }> {
   const allFileInputs: HTMLInputElement[] = querySelectorAllDeep('input[type="file"]') as HTMLInputElement[];
 
-  // 2. Also search inside any accessible same-origin iframes
   try {
     const iframes = document.querySelectorAll("iframe");
     iframes.forEach((iframe) => {
@@ -225,143 +295,147 @@ export function findResumeUploadInputs(): HTMLInputElement[] {
     });
   } catch {}
 
-  const resumeKeywords = /resume|cv\b|curriculum|biodata|profile[\s_-]?upload|attach[\s_-]?resume|upload[\s_-]?resume|upload[\s_-]?cv|upload[\s_-]?document|document|doc|docx|pdf|txt|file[\s_-]?upload|upload[\s_-]?either/i;
-
-  const resumeInputs: HTMLInputElement[] = [];
+  const result: Array<{ input: HTMLInputElement; category: string; label: string }> = [];
 
   for (const input of allFileInputs) {
-    if (!isFileInputActive(input)) {
-      continue;
-    }
+    if (!isFileInputActive(input)) continue;
 
     const name = input.getAttribute("name") || "";
     const id = input.getAttribute("id") || "";
     const accept = (input.getAttribute("accept") || "").toLowerCase();
     const ariaLabel = input.getAttribute("aria-label") || "";
-    const parentText = (input.parentElement?.textContent || "").slice(0, 300);
-    const label = input.closest("label") || (input.id ? document.querySelector(`label[for="${input.id}"]`) : null);
-    const labelText = (label?.textContent || "").slice(0, 300);
-    const container = input.closest('form, section, div[class*="upload"], div[class*="resume"], div[class*="drop"], div[class*="file"], div[class*="card"], div[class*="container"]');
-    const containerText = (container?.textContent || "").slice(0, 500);
-    const dataAutomation = input.getAttribute("data-automation-id") || input.getAttribute("data-testid") || "";
 
-    const textBlob = `${name} ${id} ${ariaLabel} ${labelText} ${parentText} ${containerText} ${dataAutomation}`.toLowerCase();
-
-    // Skip avatar / profile picture inputs (e.g. image-only uploaders without document/pdf support)
+    // Skip avatar / profile picture inputs
     const isImageOnly = (accept.includes("image") || accept.includes("png") || accept.includes("jpeg") || accept.includes("jpg")) &&
       !accept.includes("pdf") && !accept.includes("doc") && !accept.includes("docx") && !accept.includes("txt");
     const isAvatar = /avatar|photo|profile[\s_-]?pic|picture|selfie|headshot/i.test(name || id || ariaLabel);
-    if (isImageOnly || isAvatar) {
-      continue;
-    }
+    if (isImageOnly && isAvatar) continue;
 
-    const isPdfAccept = accept.includes("pdf") || accept.includes("doc") || accept.includes("docx") || accept.includes("txt");
-    const matchesResumeKeyword = resumeKeywords.test(textBlob);
-
-    // Only match if explicitly matches resume keyword OR accepts pdf/doc with relevant document text
-    if (matchesResumeKeyword || (isPdfAccept && (textBlob.includes("upload") || textBlob.includes("attach") || textBlob.includes("file") || textBlob.includes("document")))) {
-      if (!resumeInputs.includes(input)) {
-        resumeInputs.push(input);
-      }
-    }
+    const classified = classifyFileInputCategory(input);
+    result.push({
+      input,
+      category: classified.category,
+      label: classified.label,
+    });
   }
 
-  // 3. Fallback: search for custom "Upload Resume" / "Upload CV" buttons that trigger hidden inputs
-  if (resumeInputs.length === 0) {
+  // Fallback for custom stylized buttons
+  if (result.length === 0) {
     const uploadButtons = Array.from(
       document.querySelectorAll('button, a, div[role="button"], span[role="button"], label, div[class*="upload"], div[class*="dropzone"]')
     );
 
     for (const btn of uploadButtons) {
-      // Must be visible
       if (btn instanceof HTMLElement && (btn.offsetParent === null || window.getComputedStyle(btn).display === "none")) {
         continue;
       }
       const btnText = (btn.textContent || "").toLowerCase();
-      if (/upload[\s_-]?resume|upload[\s_-]?cv|attach[\s_-]?resume|upload[\s_-]?either|resume[\s_-]?or[\s_-]?cv/i.test(btnText)) {
+      if (/upload[\s_-]?resume|upload[\s_-]?cv|attach[\s_-]?resume|upload[\s_-]?document|upload[\s_-]?marksheet|upload[\s_-]?transcript/i.test(btnText)) {
         const parent = btn.closest('div, section, form') || btn.parentElement;
         if (parent) {
           const fileInput = parent.querySelector('input[type="file"]') as HTMLInputElement | null;
-          if (fileInput && isFileInputActive(fileInput) && !resumeInputs.includes(fileInput)) {
-            resumeInputs.push(fileInput);
+          if (fileInput && isFileInputActive(fileInput) && !result.some((r) => r.input === fileInput)) {
+            const classified = classifyFileInputCategory(fileInput);
+            result.push({
+              input: fileInput,
+              category: classified.category,
+              label: classified.label || btnText,
+            });
           }
         }
       }
     }
   }
 
-  return resumeInputs;
+  return result;
 }
 
-
-
-export interface SavedResumeDoc {
-  id?: string;
-  title?: string;
-  filename: string;
-  sizeBytes?: number;
-  mimeType?: string;
-  fileData?: string; // base64
+export function findResumeUploadInputs(): HTMLInputElement[] {
+  return findDocumentUploadInputs().map((r) => r.input);
 }
 
 /**
- * Automatically uploads the user's Resume PDF to all detected file upload inputs.
- * If a real saved resume from the database is provided, uploads that exact document.
- * Otherwise, generates candidate details PDF on-the-fly.
+ * Automatically detects document fields on the form and uploads the exact corresponding
+ * user document (Resume, 10th Marksheet, 12th Marksheet, College Transcript, or Cover Letter).
  */
 export function autoUploadResume(
   profile: UserProfile | null,
-  savedResume?: SavedResumeDoc | null
-): ResumeUploadResult {
-  const fileInputs = findResumeUploadInputs();
-  if (fileInputs.length === 0) {
+  savedResume?: SavedDocumentItem | null,
+  allDocuments?: SavedDocumentItem[] | null
+): DocumentUploadResult {
+  const documentInputs = findDocumentUploadInputs();
+  if (documentInputs.length === 0) {
     return {
       detected: false,
       uploaded: false,
       elementCount: 0,
       fileName: "",
       fileSizeBytes: 0,
+      uploadedDocuments: [],
     };
   }
 
   const firstName = profile?.personal?.firstName || "Sanjeev";
   const lastName = profile?.personal?.lastName || "Kumar";
-  
-  let pdfBlob: Blob;
-  let rawFileName: string;
+  const docsPool = allDocuments || (savedResume ? [savedResume] : []);
 
-  if (savedResume && savedResume.fileData) {
+  let totalUploaded = 0;
+  let primaryFileName = "";
+  let primaryFileSize = 0;
+  const uploadedDetails: Array<{ category: string; fileName: string; fieldLabel: string }> = [];
+
+  for (const { input, category, label } of documentInputs) {
     try {
-      const binaryString = atob(savedResume.fileData);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      // Find matching document in user's documents pool
+      let targetDoc: SavedDocumentItem | undefined = undefined;
+
+      if (category === "secondaryMarksheet") {
+        targetDoc = docsPool.find((d) => d.category === "secondaryMarksheet" || d.tags?.includes("10th"));
+      } else if (category === "higherSecondaryMarksheet") {
+        targetDoc = docsPool.find((d) => d.category === "higherSecondaryMarksheet" || d.tags?.includes("12th"));
+      } else if (category === "collegeTranscript") {
+        targetDoc = docsPool.find((d) => d.category === "collegeTranscript" || d.tags?.includes("Transcript"));
+      } else if (category === "coverLetter") {
+        targetDoc = docsPool.find((d) => d.category === "coverLetter" || d.tags?.includes("Cover Letter"));
       }
-      pdfBlob = new Blob([bytes], { type: savedResume.mimeType || "application/pdf" });
-      rawFileName = savedResume.filename || `${firstName}_${lastName}_Resume.pdf`.replace(/\s+/g, "_");
-    } catch {
-      pdfBlob = generateResumePdfBlob(profile);
-      rawFileName = `${firstName}_${lastName}_Resume.pdf`.replace(/\s+/g, "_");
-    }
-  } else {
-    pdfBlob = generateResumePdfBlob(profile);
-    rawFileName = `${firstName}_${lastName}_Resume.pdf`.replace(/\s+/g, "_");
-  }
 
-  const pdfFile = new File([pdfBlob], rawFileName, { type: savedResume?.mimeType || "application/pdf" });
+      // If no specific category matched or category is resume, use preferred or first resume
+      if (!targetDoc) {
+        targetDoc = docsPool.find((d) => d.isPreferred) || docsPool.find((d) => d.category === "resume" || d.tags?.includes("Resume")) || savedResume || docsPool[0];
+      }
 
-  let uploadedCount = 0;
+      let fileBlob: Blob;
+      let rawFileName: string;
+      let mimeType = targetDoc?.mimeType || "application/pdf";
 
-  for (const input of fileInputs) {
-    try {
+      if (targetDoc && targetDoc.fileData) {
+        try {
+          const binaryString = atob(targetDoc.fileData);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          fileBlob = new Blob([bytes], { type: mimeType });
+          rawFileName = targetDoc.filename;
+        } catch {
+          fileBlob = generateResumePdfBlob(profile);
+          rawFileName = `${firstName}_${lastName}_${category === "resume" ? "Resume" : category}.pdf`.replace(/\s+/g, "_");
+        }
+      } else {
+        fileBlob = generateResumePdfBlob(profile);
+        rawFileName = `${firstName}_${lastName}_Resume.pdf`.replace(/\s+/g, "_");
+      }
+
+      const fileObj = new File([fileBlob], rawFileName, { type: mimeType });
+
       let dataTransfer: DataTransfer | null = null;
       if (typeof DataTransfer !== "undefined") {
         dataTransfer = new DataTransfer();
-        dataTransfer.items.add(pdfFile);
+        dataTransfer.items.add(fileObj);
         input.files = dataTransfer.files;
       } else {
         Object.defineProperty(input, "files", {
-          value: [pdfFile],
+          value: [fileObj],
           writable: true,
           configurable: true,
         });
@@ -381,7 +455,7 @@ export function autoUploadResume(
       input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
       input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
 
-      // Dispatch drag & drop event if page uses Dropzone / React Dropzone
+      // Dispatch drag & drop event if page uses Dropzone
       if (dataTransfer && typeof DragEvent !== "undefined") {
         try {
           const dropEvent = new DragEvent("drop", {
@@ -401,23 +475,24 @@ export function autoUploadResume(
       }
 
       // Also trigger on closest label
-      const label = input.closest("label") || (input.id ? document.querySelector(`label[for="${input.id}"]`) : null);
-      if (label) {
-        label.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-      }
-
-      // Also notify any nearby "Upload Resume" buttons or drop targets
-      const container = input.closest('div, section, form');
-      if (container) {
-        const customBtn = container.querySelector('button, [role="button"]');
-        if (customBtn) {
-          customBtn.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-        }
+      const closestLabel = input.closest("label") || (input.id ? document.querySelector(`label[for="${input.id}"]`) : null);
+      if (closestLabel) {
+        closestLabel.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
       }
 
       input.dispatchEvent(new Event("blur", { bubbles: true }));
 
-      uploadedCount++;
+      totalUploaded++;
+      if (!primaryFileName) {
+        primaryFileName = rawFileName;
+        primaryFileSize = fileBlob.size;
+      }
+
+      uploadedDetails.push({
+        category,
+        fileName: rawFileName,
+        fieldLabel: label,
+      });
     } catch (err) {
       console.warn("Could not set file on input:", err);
     }
@@ -425,9 +500,10 @@ export function autoUploadResume(
 
   return {
     detected: true,
-    uploaded: uploadedCount > 0,
-    elementCount: uploadedCount,
-    fileName: rawFileName,
-    fileSizeBytes: pdfBlob.size,
+    uploaded: totalUploaded > 0,
+    elementCount: totalUploaded,
+    fileName: primaryFileName,
+    fileSizeBytes: primaryFileSize,
+    uploadedDocuments: uploadedDetails,
   };
 }

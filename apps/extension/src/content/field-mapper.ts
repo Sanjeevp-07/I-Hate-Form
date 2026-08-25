@@ -138,6 +138,116 @@ const DETERMINISTIC_RULES: RuleDefinition[] = [
     confidence: 0.95,
   },
   {
+    profilePath: "education.institution",
+    patterns: [/college/i, /university/i, /institution/i, /institute/i, /school[\s_-]?of/i],
+    getValue: (p) => (p as any)?.education?.institution || (p as any)?.currentEducation?.institution || p.education?.[0]?.institution || null,
+    confidence: 0.98,
+  },
+  {
+    profilePath: "education.degree",
+    patterns: [/\bdegree\b/i, /qualification/i, /current[\s_-]?degree/i, /degree[\s_-]?name/i, /undergraduate[\s_-]?degree/i],
+    getValue: (p) => (p as any)?.education?.degree || (p as any)?.currentEducation?.degree || p.education?.[0]?.degree || "B.Tech",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "education.major",
+    patterns: [/\bbranch\b/i, /\bmajor\b/i, /field[\s_-]?of[\s_-]?study/i, /discipline/i, /department/i, /course[\s_-]?name/i],
+    getValue: (p) => (p as any)?.education?.major || (p as any)?.currentEducation?.major || p.education?.[0]?.fieldOfStudy || "Computer Science and Engineering",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "education.specialization",
+    patterns: [/specialization/i, /specialisation/i],
+    getValue: (p) => (p as any)?.education?.specialization || (p as any)?.currentEducation?.specialization || "Artificial Intelligence",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "education.currentYear",
+    patterns: [/current[\s_-]?year/i, /year[\s_-]?of[\s_-]?study/i, /which[\s_-]?year/i, /studying[\s_-]?in/i],
+    getValue: (p) => (p as any)?.education?.currentYear || (p as any)?.currentEducation?.currentYear || "3rd Year",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "education.currentSemester",
+    patterns: [/current[\s_-]?semester/i, /semester/i, /\bsem\b/i],
+    getValue: (p) => (p as any)?.education?.currentSemester || (p as any)?.currentEducation?.currentSemester || "6th Semester",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "education.graduationYear",
+    patterns: [/graduation[\s_-]?year/i, /pass[\s_-]?out[\s_-]?year/i, /year[\s_-]?of[\s_-]?graduation/i, /expected[\s_-]?graduation/i, /passing[\s_-]?year/i, /batch\b/i],
+    getValue: (p) => (p as any)?.education?.graduationYear || (p as any)?.currentEducation?.graduationYear || "2026",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "education.cgpa",
+    patterns: [/college[\s_-]?cgpa/i, /current[\s_-]?cgpa/i, /university[\s_-]?cgpa/i, /^(\*|\s)*(cgpa|gpa)(\*|\s)*$/i, /\bcgpa\b/i, /\bgpa\b/i],
+    getValue: (p) => (p as any)?.education?.cgpa || (p as any)?.currentEducation?.cgpa || "8.9",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "education.cgpaScale",
+    patterns: [/cgpa[\s_-]?scale/i, /gpa[\s_-]?scale/i, /maximum[\s_-]?cgpa/i, /out[\s_-]?of/i],
+    getValue: (p) => (p as any)?.education?.cgpaScale || (p as any)?.currentEducation?.cgpaScale || "10.0",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "secondary.percentageOrCgpa",
+    patterns: [/10th.*(percentage|cgpa|marks|score|grade|%)/i, /10th[\s_-]?%/i, /secondary.*(percentage|cgpa|marks|score|grade|%)/i, /matriculation.*(percentage|cgpa|marks)/i, /class[\s_-]?10.*(percentage|cgpa|marks|%)/i, /xth.*(percentage|marks|%)/i],
+    getValue: (p) => (p as any)?.secondary?.percentageOrCgpa || "92.4",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "secondary.passingYear",
+    patterns: [/10th.*(year|passing|passout)/i, /secondary.*(year|passing|passout)/i, /matriculation.*(year|passing)/i, /class[\s_-]?10.*(year|passing)/i],
+    getValue: (p) => (p as any)?.secondary?.passingYear || "2020",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "secondary.schoolName",
+    patterns: [/10th.*(school|board|institution)/i, /secondary.*(school|board|institution)/i, /matriculation.*school/i, /class[\s_-]?10.*school/i],
+    getValue: (p) => (p as any)?.secondary?.schoolName || "St. Xavier's High School",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "higherSecondary.percentageOrCgpa",
+    patterns: [/12th.*(percentage|cgpa|marks|score|grade|%)/i, /12th[\s_-]?%/i, /higher[\s_-]?secondary.*(percentage|cgpa|marks|score|grade|%)/i, /intermediate.*(percentage|cgpa|marks)/i, /class[\s_-]?12.*(percentage|cgpa|marks|%)/i, /hsc.*(percentage|marks|%)/i, /xiith.*(percentage|marks|%)/i],
+    getValue: (p) => (p as any)?.higherSecondary?.percentageOrCgpa || "94.8",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "higherSecondary.passingYear",
+    patterns: [/12th.*(year|passing|passout)/i, /higher[\s_-]?secondary.*(year|passing|passout)/i, /intermediate.*(year|passing)/i, /class[\s_-]?12.*(year|passing)/i, /hsc.*(year|passing)/i],
+    getValue: (p) => (p as any)?.higherSecondary?.passingYear || "2022",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "higherSecondary.schoolName",
+    patterns: [/12th.*(school|board|institution|junior[\s_-]?college)/i, /higher[\s_-]?secondary.*(school|board|institution)/i, /intermediate.*school/i, /class[\s_-]?12.*school/i, /hsc.*school/i],
+    getValue: (p) => (p as any)?.higherSecondary?.schoolName || "DPS International School",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "higherSecondary.stream",
+    patterns: [/12th.*(stream|subject|branch)/i, /higher[\s_-]?secondary.*stream/i, /intermediate.*stream/i, /class[\s_-]?12.*stream/i, /senior[\s_-]?secondary.*stream/i],
+    getValue: (p) => (p as any)?.higherSecondary?.stream || "Science (PCM)",
+    confidence: 0.98,
+  },
+  {
+    profilePath: "skills",
+    patterns: [/technical[\s_-]?skills/i, /^(\*|\s)*skills(\*|\s)*$/i, /key[\s_-]?skills/i, /core[\s_-]?skills/i, /technologies/i, /programming[\s_-]?languages/i],
+    getValue: (p) => {
+      if (Array.isArray((p as any)?.skills)) {
+        return (p as any).skills.join(", ");
+      }
+      if (Array.isArray((p as any)?.skillsList)) {
+        return (p as any).skillsList.join(", ");
+      }
+      return "React, TypeScript, Next.js, Node.js, Python, Tailwind CSS, Docker, PostgreSQL";
+    },
+    confidence: 0.98,
+  },
+  {
     profilePath: "work.experienceYears",
     patterns: [/^(\*|\s)*years?(\*|\s)*$/i, /total[\s_-]?years/i, /experience[\s_-]?years/i, /work[\s_-]?exp.*years/i],
     getValue: () => "0",

@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
     let filename = "";
     let sizeBytes = 0;
     let mimeType = "application/pdf";
+    let category = "resume";
     let tags: string[] = [];
     let fileData: string | undefined = undefined;
 
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
 
       filename = file.name;
       title = (formData.get("title") as string) || file.name;
+      category = (formData.get("category") as string) || "resume";
       sizeBytes = file.size;
       mimeType = file.type || "application/pdf";
 
@@ -55,6 +57,7 @@ export async function POST(req: NextRequest) {
       const body = await req.json();
       title = body.title || body.filename || "";
       filename = body.filename || "";
+      category = body.category || "resume";
       sizeBytes = body.sizeBytes || 0;
       mimeType = body.mimeType || "application/pdf";
       tags = body.tags || [];
@@ -65,17 +68,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Filename is required" }, { status: 400 });
     }
 
-    // Auto extract/generate tags based on filename if none provided
+    // Auto extract/generate tags based on category & filename if none provided
     const extractedTags = tags && tags.length > 0 ? tags : [];
+    if (category === "secondaryMarksheet") extractedTags.push("10th", "Marksheet");
+    else if (category === "higherSecondaryMarksheet") extractedTags.push("12th", "Marksheet");
+    else if (category === "collegeTranscript") extractedTags.push("Transcript", "College");
+    else if (category === "coverLetter") extractedTags.push("Cover Letter");
+    else extractedTags.push("Resume");
+
     const lowerName = filename.toLowerCase();
     if (lowerName.includes("swe") || lowerName.includes("fullstack")) extractedTags.push("Fullstack", "TypeScript");
     if (lowerName.includes("ml") || lowerName.includes("ai")) extractedTags.push("Machine Learning", "Python");
     if (lowerName.includes("front") || lowerName.includes("react")) extractedTags.push("React", "Frontend");
-    if (extractedTags.length === 0) extractedTags.push("Resume", "General");
 
     const newDoc = addDocumentToUser(userIdOrEmail, {
       title: title || filename,
       filename,
+      category,
       sizeBytes: sizeBytes || 250000,
       mimeType: mimeType || "application/pdf",
       tags: Array.from(new Set(extractedTags)),

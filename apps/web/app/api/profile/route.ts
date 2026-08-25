@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   try {
     const sessionUser = await getAuthenticatedUser(req);
     const body = await req.json();
-    const { personal, links } = body;
+    const { personal, education, secondary, higherSecondary, skills, links, documents } = body;
 
     if (!personal) {
       return NextResponse.json({ error: "Personal information is required" }, { status: 400 });
@@ -49,7 +49,12 @@ export async function POST(req: NextRequest) {
     const targetKey = sessionUser?.id || sessionUser?.email || personal.email || "user_sanjeev";
     const profileToSave: StoredProfile = {
       personal: personal || {},
+      education: education || {},
+      secondary: secondary || {},
+      higherSecondary: higherSecondary || {},
+      skills: Array.isArray(skills) ? skills : [],
       links: links || {},
+      documents: documents || {},
     };
 
     const updatedUser = updateUserProfile(targetKey, profileToSave);
