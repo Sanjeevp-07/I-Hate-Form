@@ -3,6 +3,8 @@ export type FormElementType =
   | "email"
   | "tel"
   | "number"
+  | "date"
+  | "url"
   | "textarea"
   | "select"
   | "radio"

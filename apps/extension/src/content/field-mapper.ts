@@ -324,6 +324,73 @@ const DETERMINISTIC_RULES: RuleDefinition[] = [
     getValue: (p) => (p?.personal as any)?.password || "Password@12345",
     confidence: 0.95,
   },
+  // 10. Documents & Resume Uploads
+  {
+    profilePath: "documents.secondaryMarksheet",
+    patterns: [
+      /10th.*(marksheet|certificate|document|file|upload)/i,
+      /secondary.*(marksheet|certificate|document|upload)/i,
+      /matriculation.*(marksheet|certificate|document|upload)/i,
+      /class[\s_-]?10.*(marksheet|certificate|upload)/i,
+    ],
+    getValue: (p) => (p as any)?.secondaryMarksheetFileName || `${p?.personal?.firstName || "Sanjeev"}_${p?.personal?.lastName || "Kumar"}_10th_Marksheet.pdf`,
+    confidence: 0.99,
+  },
+  {
+    profilePath: "documents.higherSecondaryMarksheet",
+    patterns: [
+      /12th.*(marksheet|certificate|document|file|upload)/i,
+      /higher[\s_-]?secondary.*(marksheet|certificate|document|upload)/i,
+      /intermediate.*(marksheet|certificate|document|upload)/i,
+      /class[\s_-]?12.*(marksheet|certificate|upload)/i,
+      /hsc.*(marksheet|certificate|upload)/i,
+    ],
+    getValue: (p) => (p as any)?.higherSecondaryMarksheetFileName || `${p?.personal?.firstName || "Sanjeev"}_${p?.personal?.lastName || "Kumar"}_12th_Marksheet.pdf`,
+    confidence: 0.99,
+  },
+  {
+    profilePath: "documents.collegeTranscript",
+    patterns: [
+      /transcript/i,
+      /college[\s_-]?marksheet/i,
+      /semester[\s_-]?marksheet/i,
+      /university[\s_-]?marksheet/i,
+      /degree[\s_-]?cert/i,
+      /consolidated[\s_-]?marksheet/i,
+    ],
+    getValue: (p) => (p as any)?.transcriptFileName || `${p?.personal?.firstName || "Sanjeev"}_${p?.personal?.lastName || "Kumar"}_College_Transcript.pdf`,
+    confidence: 0.99,
+  },
+  {
+    profilePath: "documents.coverLetter",
+    patterns: [
+      /cover[\s_-]?letter/i,
+      /statement[\s_-]?of[\s_-]?purpose/i,
+      /\bsop\b/i,
+      /letter[\s_-]?of[\s_-]?intent/i,
+      /motivation[\s_-]?letter/i,
+    ],
+    getValue: (p) => (p as any)?.coverLetterFileName || `${p?.personal?.firstName || "Sanjeev"}_${p?.personal?.lastName || "Kumar"}_Cover_Letter.pdf`,
+    confidence: 0.99,
+  },
+  {
+    profilePath: "documents.resume",
+    patterns: [
+      /resume[\s_-]?\/[\s_-]?cv/i,
+      /resume[\s_-]?upload/i,
+      /upload[\s_-]?resume/i,
+      /upload[\s_-]?cv/i,
+      /curriculum[\s_-]?vitae/i,
+      /\bresume\b/i,
+      /\bcv\b/i,
+      /attach[\s_-]?resume/i,
+      /your[\s_-]?resume/i,
+      /add[\s_-]?file/i,
+      /supported[\s_-]?file/i,
+    ],
+    getValue: (p) => (p as any)?.resumeFileName || `${p?.personal?.firstName || "Sanjeev"}_${p?.personal?.lastName || "Kumar"}_Resume.pdf`,
+    confidence: 0.99,
+  },
 ];
 
 export function mapFieldDeterministically(
@@ -334,6 +401,7 @@ export function mapFieldDeterministically(
   const directLabel = `${cleanLabel} ${field.normalizedLabel || ""}`.trim();
   const fullContext = `${directLabel} ${field.name || ""} ${field.autocomplete || ""} ${field.nearbyText || ""}`.trim();
   const isEmailContext = field.type === "email" || /e[\s_-]?mail/i.test(directLabel) || /e[\s_-]?mail/i.test(field.name || "") || field.autocomplete === "email";
+  const isFileContext = field.type === "file" || /resume|cv|marksheet|transcript|cover[\s_-]?letter|add[\s_-]?file|upload 1 supported/i.test(directLabel);
 
   // Fast path for explicit email type or label
   if (isEmailContext) {
@@ -348,6 +416,26 @@ export function mapFieldDeterministically(
       action: "fill",
       source: "rule",
       reason: "Matched explicit email field",
+    };
+  }
+
+  // Fast path for file upload field
+  if (isFileContext) {
+    let matchedRule = DETERMINISTIC_RULES.find((r) => r.profilePath.startsWith("documents.") && r.patterns.some((p) => p.test(directLabel)));
+    if (!matchedRule) {
+      matchedRule = DETERMINISTIC_RULES.find((r) => r.profilePath === "documents.resume");
+    }
+    const val = profile && matchedRule ? matchedRule.getValue(profile) : `${profile?.personal?.firstName || "Sanjeev"}_${profile?.personal?.lastName || "Kumar"}_Resume.pdf`;
+    return {
+      fieldId: field.id,
+      rawLabel: field.rawLabel,
+      normalizedLabel: field.normalizedLabel,
+      profilePath: matchedRule?.profilePath || "documents.resume",
+      valueToFill: val,
+      confidence: 0.99,
+      action: "fill",
+      source: "rule",
+      reason: "Matched document/resume file upload field",
     };
   }
 
@@ -568,9 +656,24 @@ export function verifyAndCorrectFieldAnswers(
       continue;
     }
 
-    // 8. Notice Period
-    if (/notice[\s_-]?period|joining[\s_-]?time|availability/i.test(cleanLabel)) {
-      if (isNarrativeParagraph(strVal)) correctedAnswers[field.id] = "Immediate";
+    // 8. Notice Period / Joining Date
+    if (/notice[\s_-]?period|joining[\s_-]?time|availability|joining[\s_-]?date|start[\s_-]?date/i.test(cleanLabel)) {
+      if (field.type === "date" || /date/i.test(cleanLabel)) {
+        correctedAnswers[field.id] = new Date().toISOString().split("T")[0];
+      } else if (isNarrativeParagraph(strVal)) {
+        correctedAnswers[field.id] = "Immediate";
+      }
+      continue;
+    }
+
+    // 8.5 Date fields general guard
+    if (field.type === "date") {
+      const todayStr = new Date().toISOString().split("T")[0];
+      if (/dob|birth/i.test(cleanLabel)) {
+        correctedAnswers[field.id] = "2005-07-06";
+      } else if (!/^\d{4}-\d{2}-\d{2}$/.test(strVal) || isNarrativeParagraph(strVal)) {
+        correctedAnswers[field.id] = todayStr;
+      }
       continue;
     }
 

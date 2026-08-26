@@ -308,4 +308,57 @@ describe("Phase 9: Google Forms Compatibility & Autofill", () => {
       expect(c.classList.contains("CDNmEc")).toBe(true);
     });
   });
+
+  it("Scans and maps Google Forms 'Resume / CV Upload' questions and auto-uploads the candidate resume PDF", async () => {
+    document.body.innerHTML = `
+      <form class="freebirdFormviewerViewFormCard">
+        <!-- Question 1: College / University Name -->
+        <div role="listitem" class="Qr7Oae">
+          <div class="geS5n">
+            <div id="i1" class="M7eMe" role="heading">College / University Name</div>
+            <div class="Xb9hP">
+              <input type="text" class="whsOnd zHQkBf" jsname="YPqjbf" id="college_input" aria-labelledby="i1" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Question 2: Resume / CV Upload (As shown in Google Forms with Add File button) -->
+        <div role="listitem" class="Qr7Oae">
+          <div class="geS5n">
+            <div id="i5" class="M7eMe" role="heading">Resume / CV Upload</div>
+            <div class="A11qce">Upload 1 supported file. Max 10 MB.</div>
+            <div class="I350fd">
+              <div role="button" class="uArJ5e UQuaGc kCyAyd" aria-label="Add file" tabindex="0">
+                <span class="l4V7wb Fxmcue">
+                  <span class="NPEfkd RveJvd snByac">Add File</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+    `;
+
+    const fields = scanFormFields();
+    expect(fields.length).toBe(2);
+
+    expect(fields[0].rawLabel).toContain("College / University Name");
+    expect(fields[1].rawLabel).toContain("Resume / CV Upload");
+    expect(fields[1].type).toBe("file");
+
+    const mappedCollege = mapFieldDeterministically(fields[0], mockProfile);
+    const mappedResume = mapFieldDeterministically(fields[1], mockProfile);
+
+    expect(mappedResume.profilePath).toBe("documents.resume");
+    expect(mappedResume.valueToFill).toContain("Resume.pdf");
+    expect(mappedResume.confidence).toBeGreaterThanOrEqual(0.95);
+
+    const mappings = [mappedCollege, mappedResume];
+    const autofillResult = await executeAutofill(fields, mappings, mockProfile);
+
+    expect(autofillResult.resumeUpload).toBeDefined();
+    expect(autofillResult.resumeUpload?.detected).toBe(true);
+    expect(autofillResult.resumeUpload?.uploaded).toBe(true);
+    expect(autofillResult.resumeUpload?.fileName).toContain("Resume.pdf");
+  });
 });

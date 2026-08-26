@@ -129,17 +129,41 @@ export function setNativeValue(
       } else {
         expectedValue = String(value);
 
-        // Date input normalization (HTML5 type="date" requires YYYY-MM-DD)
+        // Date input normalization (HTML5 type="date" strictly requires YYYY-MM-DD format)
         if (element.type === "date" && expectedValue) {
-          const parts = expectedValue.split(/[/.-]/);
-          if (parts.length === 3) {
-            if (parts[2].length === 4) {
-              // DD/MM/YYYY -> YYYY-MM-DD
-              expectedValue = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
-            } else if (parts[0].length === 4) {
-              // YYYY/MM/DD -> YYYY-MM-DD
-              expectedValue = `${parts[0]}-${parts[1].padStart(2, "0")}-${parts[2].padStart(2, "0")}`;
+          const raw = expectedValue.trim().toLowerCase();
+          const todayStr = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
+          if (
+            raw === "immediate" ||
+            raw === "immediate joiner" ||
+            raw === "today" ||
+            raw === "now" ||
+            raw === "asap" ||
+            raw === "available" ||
+            raw.includes("immediate")
+          ) {
+            expectedValue = todayStr;
+          } else {
+            const parts = expectedValue.split(/[/.-]/);
+            if (parts.length === 3) {
+              if (parts[2].length === 4) {
+                // DD/MM/YYYY or MM/DD/YYYY -> YYYY-MM-DD
+                expectedValue = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+              } else if (parts[0].length === 4) {
+                // YYYY/MM/DD -> YYYY-MM-DD
+                expectedValue = `${parts[0]}-${parts[1].padStart(2, "0")}-${parts[2].padStart(2, "0")}`;
+              }
+            } else if (!/^\d{4}-\d{2}-\d{2}$/.test(expectedValue)) {
+              const parsed = new Date(expectedValue);
+              if (!isNaN(parsed.getTime())) {
+                expectedValue = parsed.toISOString().split("T")[0];
+              } else {
+                expectedValue = todayStr;
+              }
             }
+          }
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(expectedValue)) {
+            expectedValue = todayStr;
           }
         }
 

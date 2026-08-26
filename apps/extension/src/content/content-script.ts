@@ -24,11 +24,12 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
   (window as any).__IHATEFORM_SCAN_WITH_STATS__ = () => {
     const scanStats = scanFormFieldsWithStats();
     const resumeInputs = findResumeUploadInputs();
+    const hasResume = resumeInputs.length > 0 || scanStats.fields.some((f) => f.type === "file");
     return {
       frameId: currentFrameId,
       fields: scanStats.fields,
       closedShadowRootsDetected: scanStats.closedShadowRootsDetected,
-      hasResumeField: resumeInputs.length > 0,
+      hasResumeField: hasResume,
     };
   };
 
@@ -48,11 +49,12 @@ import { ExtensionMessage, FillFieldsPayload, FillResultPayload, ScanResultPaylo
       try {
         const scanStats = scanFormFieldsWithStats();
         const resumeInputs = findResumeUploadInputs();
+        const hasResume = resumeInputs.length > 0 || scanStats.fields.some((f) => f.type === "file");
         const payload: ScanResultPayload & { closedShadowRootsDetected?: number; hasResumeField?: boolean } = {
           frameId: currentFrameId,
           fields: scanStats.fields,
           closedShadowRootsDetected: scanStats.closedShadowRootsDetected,
-          hasResumeField: resumeInputs.length > 0,
+          hasResumeField: hasResume,
         };
         sendResponse(payload);
       } catch (err) {

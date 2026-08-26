@@ -273,10 +273,17 @@ export function classifyFileInputCategory(input: HTMLInputElement): { category: 
   return { category: "resume", label: directLabel || "Resume / CV" };
 }
 
+export interface DocumentUploadTarget {
+  input?: HTMLInputElement;
+  triggerElement?: HTMLElement;
+  category: string;
+  label: string;
+}
+
 /**
- * Searches the DOM, accessible iframes, and all shadow roots for document file upload inputs.
+ * Searches the DOM, accessible iframes, and all shadow roots for document file upload inputs and Google Forms Add File buttons.
  */
-export function findDocumentUploadInputs(): Array<{ input: HTMLInputElement; category: string; label: string }> {
+export function findDocumentUploadInputs(): DocumentUploadTarget[] {
   const allFileInputs: HTMLInputElement[] = querySelectorAllDeep('input[type="file"]') as HTMLInputElement[];
 
   try {
@@ -295,7 +302,7 @@ export function findDocumentUploadInputs(): Array<{ input: HTMLInputElement; cat
     });
   } catch {}
 
-  const result: Array<{ input: HTMLInputElement; category: string; label: string }> = [];
+  const result: DocumentUploadTarget[] = [];
 
   for (const input of allFileInputs) {
     if (!isFileInputActive(input)) continue;
@@ -319,30 +326,67 @@ export function findDocumentUploadInputs(): Array<{ input: HTMLInputElement; cat
     });
   }
 
-  // Fallback for custom stylized buttons
-  if (result.length === 0) {
-    const uploadButtons = Array.from(
-      document.querySelectorAll('button, a, div[role="button"], span[role="button"], label, div[class*="upload"], div[class*="dropzone"]')
-    );
+  // 2. Google Forms "Add file" Question Buttons
+  const googleFormItems = document.querySelectorAll('.Qr7Oae, [role="listitem"], .geS5n');
+  googleFormItems.forEach((item) => {
+    const heading = item.querySelector('.M7eMe, [role="heading"], div.HoPnR')?.textContent || "";
+    const itemText = (item.textContent || "").toLowerCase();
+    const isFileQuestion =
+      itemText.includes("add file") ||
+      itemText.includes("upload 1 supported file") ||
+      itemText.includes("supported file") ||
+      /resume|cv|marksheet|transcript|cover[\s_-]?letter|portfolio|certificate|upload/i.test(heading);
 
-    for (const btn of uploadButtons) {
-      if (btn instanceof HTMLElement && (btn.offsetParent === null || window.getComputedStyle(btn).display === "none")) {
-        continue;
+    if (isFileQuestion) {
+      const addFileBtn = item.querySelector('[role="button"][aria-label*="Add file" i], [role="button"][aria-label*="Add File" i], div[role="button"], .uArJ5e') as HTMLElement | null;
+      if (addFileBtn && !result.some((r) => r.triggerElement === addFileBtn)) {
+        let category = "resume";
+        if (/10th|secondary|matriculation/i.test(heading)) category = "secondaryMarksheet";
+        else if (/12th|higher[\s_-]?secondary|intermediate/i.test(heading)) category = "higherSecondaryMarksheet";
+        else if (/transcript|college[\s_-]?marksheet|semester/i.test(heading)) category = "collegeTranscript";
+        else if (/cover[\s_-]?letter|statement[\s_-]?of[\s_-]?purpose|\bsop\b/i.test(heading)) category = "coverLetter";
+
+        result.push({
+          triggerElement: addFileBtn,
+          category,
+          label: heading.trim() || "Resume / CV Upload",
+        });
       }
-      const btnText = (btn.textContent || "").toLowerCase();
-      if (/upload[\s_-]?resume|upload[\s_-]?cv|attach[\s_-]?resume|upload[\s_-]?document|upload[\s_-]?marksheet|upload[\s_-]?transcript/i.test(btnText)) {
-        const parent = btn.closest('div, section, form') || btn.parentElement;
-        if (parent) {
-          const fileInput = parent.querySelector('input[type="file"]') as HTMLInputElement | null;
-          if (fileInput && isFileInputActive(fileInput) && !result.some((r) => r.input === fileInput)) {
-            const classified = classifyFileInputCategory(fileInput);
-            result.push({
-              input: fileInput,
-              category: classified.category,
-              label: classified.label || btnText,
-            });
-          }
+    }
+  });
+
+  // 3. Fallback for custom stylized buttons & dropzones
+  const uploadButtons = Array.from(
+    document.querySelectorAll('button, a, div[role="button"], span[role="button"], label, div[class*="upload"], div[class*="dropzone"]')
+  );
+
+  for (const btn of uploadButtons) {
+    if (btn instanceof HTMLElement && (btn.offsetParent === null || window.getComputedStyle(btn).display === "none")) {
+      continue;
+    }
+    const btnText = (btn.textContent || "").toLowerCase();
+    const ariaLabel = (btn.getAttribute("aria-label") || "").toLowerCase();
+    if (
+      /upload[\s_-]?resume|upload[\s_-]?cv|attach[\s_-]?resume|upload[\s_-]?document|upload[\s_-]?marksheet|upload[\s_-]?transcript/i.test(btnText) ||
+      /add[\s_-]?file|upload[\s_-]?file/i.test(ariaLabel)
+    ) {
+      const parent = btn.closest('div, section, form') || btn.parentElement;
+      const fileInput = parent?.querySelector('input[type="file"]') as HTMLInputElement | null;
+      if (fileInput && isFileInputActive(fileInput)) {
+        if (!result.some((r) => r.input === fileInput)) {
+          const classified = classifyFileInputCategory(fileInput);
+          result.push({
+            input: fileInput,
+            category: classified.category,
+            label: classified.label || btnText,
+          });
         }
+      } else if (!result.some((r) => r.triggerElement === btn)) {
+        result.push({
+          triggerElement: btn as HTMLElement,
+          category: "resume",
+          label: btnText || ariaLabel || "Resume / CV Upload",
+        });
       }
     }
   }
@@ -350,8 +394,8 @@ export function findDocumentUploadInputs(): Array<{ input: HTMLInputElement; cat
   return result;
 }
 
-export function findResumeUploadInputs(): HTMLInputElement[] {
-  return findDocumentUploadInputs().map((r) => r.input);
+export function findResumeUploadInputs(): Array<HTMLInputElement | HTMLElement> {
+  return findDocumentUploadInputs().map((r) => r.input || r.triggerElement!).filter(Boolean);
 }
 
 /**
@@ -384,7 +428,7 @@ export function autoUploadResume(
   let primaryFileSize = 0;
   const uploadedDetails: Array<{ category: string; fileName: string; fieldLabel: string }> = [];
 
-  for (const { input, category, label } of documentInputs) {
+  for (const { input, triggerElement, category, label } of documentInputs) {
     try {
       // Find matching document in user's documents pool
       let targetDoc: SavedDocumentItem | undefined = undefined;
@@ -432,55 +476,80 @@ export function autoUploadResume(
       if (typeof DataTransfer !== "undefined") {
         dataTransfer = new DataTransfer();
         dataTransfer.items.add(fileObj);
-        input.files = dataTransfer.files;
-      } else {
-        Object.defineProperty(input, "files", {
-          value: [fileObj],
-          writable: true,
-          configurable: true,
-        });
       }
 
-      // Native prototype descriptor setter for React 18/19 synthetic event systems
-      try {
-        const proto = window.HTMLInputElement.prototype;
-        const descriptor = Object.getOwnPropertyDescriptor(proto, "files");
-        if (descriptor && descriptor.set && dataTransfer) {
-          descriptor.set.call(input, dataTransfer.files);
-        }
-      } catch {}
-
-      // Dispatch full bubbling events on the input element
-      input.dispatchEvent(new Event("focus", { bubbles: true }));
-      input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-
-      // Dispatch drag & drop event if page uses Dropzone
-      if (dataTransfer && typeof DragEvent !== "undefined") {
-        try {
-          const dropEvent = new DragEvent("drop", {
-            bubbles: true,
-            composed: true,
-            dataTransfer,
+      if (input) {
+        if (dataTransfer) {
+          input.files = dataTransfer.files;
+        } else {
+          Object.defineProperty(input, "files", {
+            value: [fileObj],
+            writable: true,
+            configurable: true,
           });
-          input.dispatchEvent(dropEvent);
-          if (input.parentElement) {
-            input.parentElement.dispatchEvent(dropEvent);
-          }
-          const dropContainer = input.closest('div[class*="drop"], div[class*="upload"], div[class*="resume"], label, form');
-          if (dropContainer) {
-            dropContainer.dispatchEvent(dropEvent);
+        }
+
+        // Native prototype descriptor setter for React 18/19 synthetic event systems
+        try {
+          const proto = window.HTMLInputElement.prototype;
+          const descriptor = Object.getOwnPropertyDescriptor(proto, "files");
+          if (descriptor && descriptor.set && dataTransfer) {
+            descriptor.set.call(input, dataTransfer.files);
           }
         } catch {}
-      }
 
-      // Also trigger on closest label
-      const closestLabel = input.closest("label") || (input.id ? document.querySelector(`label[for="${input.id}"]`) : null);
-      if (closestLabel) {
-        closestLabel.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-      }
+        // Dispatch full bubbling events on the input element
+        input.dispatchEvent(new Event("focus", { bubbles: true }));
+        input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
 
-      input.dispatchEvent(new Event("blur", { bubbles: true }));
+        // Dispatch drag & drop event if page uses Dropzone
+        if (dataTransfer && typeof DragEvent !== "undefined") {
+          try {
+            const dropEvent = new DragEvent("drop", {
+              bubbles: true,
+              composed: true,
+              dataTransfer,
+            });
+            input.dispatchEvent(dropEvent);
+            if (input.parentElement) {
+              input.parentElement.dispatchEvent(dropEvent);
+            }
+            const dropContainer = input.closest('div[class*="drop"], div[class*="upload"], div[class*="resume"], label, form');
+            if (dropContainer) {
+              dropContainer.dispatchEvent(dropEvent);
+            }
+          } catch {}
+        }
+
+        // Also trigger on closest label
+        const closestLabel = input.closest("label") || (input.id ? document.querySelector(`label[for="${input.id}"]`) : null);
+        if (closestLabel) {
+          closestLabel.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+        }
+
+        input.dispatchEvent(new Event("blur", { bubbles: true }));
+      } else if (triggerElement) {
+        // Trigger Google Forms Add File button or custom upload button
+        try {
+          triggerElement.click();
+        } catch {}
+
+        // Set up listener for dynamic Google Drive / Picker modal iframe or file input
+        const attachToDynamicPicker = () => {
+          try {
+            const pickerInputs = document.querySelectorAll('input[type="file"], .picker-upload-input');
+            pickerInputs.forEach((pInp) => {
+              if (pInp instanceof HTMLInputElement && dataTransfer) {
+                pInp.files = dataTransfer.files;
+                pInp.dispatchEvent(new Event("change", { bubbles: true }));
+              }
+            });
+          } catch {}
+        };
+        setTimeout(attachToDynamicPicker, 500);
+        setTimeout(attachToDynamicPicker, 1500);
+      }
 
       totalUploaded++;
       if (!primaryFileName) {

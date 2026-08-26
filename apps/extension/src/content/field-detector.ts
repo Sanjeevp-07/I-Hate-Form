@@ -190,7 +190,7 @@ function determineElementType(element: HTMLElement): FormElementType {
   if (tag === "select") return "select";
   if (tag === "input") {
     const type = (element.getAttribute("type") || "text").toLowerCase();
-    if (["email", "tel", "number", "radio", "checkbox", "file", "hidden"].includes(type)) {
+    if (["email", "tel", "number", "date", "url", "radio", "checkbox", "file", "hidden"].includes(type)) {
       return type as FormElementType;
     }
     return "text";
@@ -203,6 +203,30 @@ function determineElementType(element: HTMLElement): FormElementType {
   if (element.getAttribute("contenteditable") === "true" || element.getAttribute("contenteditable") === "") {
     return "textarea";
   }
+
+  // Check for file upload button / dropzone / Google Forms Add file
+  const ariaLabel = (element.getAttribute("aria-label") || "").toLowerCase();
+  const text = (element.textContent || "").toLowerCase();
+  const parentListItem = element.closest('.Qr7Oae, [role="listitem"], .geS5n');
+  const isGoogleFormsAddFile = parentListItem && (
+    ariaLabel.includes("add file") ||
+    text.includes("add file") ||
+    parentListItem.textContent?.toLowerCase().includes("upload 1 supported file") ||
+    parentListItem.textContent?.toLowerCase().includes("supported file")
+  );
+
+  if (
+    ariaLabel.includes("add file") ||
+    ariaLabel.includes("upload") ||
+    text.includes("add file") ||
+    text.includes("upload resume") ||
+    text.includes("upload cv") ||
+    element.classList.contains("dropzone") ||
+    isGoogleFormsAddFile
+  ) {
+    return "file";
+  }
+
   return "unknown";
 }
 

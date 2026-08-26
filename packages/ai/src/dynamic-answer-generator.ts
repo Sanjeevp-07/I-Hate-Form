@@ -93,7 +93,10 @@ function resolveContextualFallback(
       }
 
       // Notice Period
-      if (/notice|availability/i.test(combinedText)) {
+      if (/notice|availability|joining|start[\s_-]?date/i.test(combinedText)) {
+        if (field.type === "date" || /date/i.test(combinedText)) {
+          return { value: new Date().toISOString().split("T")[0], reasoning: "Supplied today's date for available joining date" };
+        }
         if (field.options && field.options.length > 0) {
           const immOpt = field.options.find((o) => /immediate|0[\s_-]?days?|15[\s_-]?days?|<[\s_-]?1[\s_-]?month/i.test(o.label)) || field.options[1];
           if (immOpt) return { value: immOpt.value || immOpt.label, reasoning: "Selected Immediate joining option for required field" };
@@ -189,8 +192,11 @@ function resolveContextualFallback(
     };
   }
 
-  // 5. Notice Period
-  if (/notice[\s_-]?period|availability[\s_-]?to[\s_-]?join|joining[\s_-]?time/i.test(combinedText)) {
+  // 5. Notice Period / Joining Date
+  if (/notice[\s_-]?period|availability[\s_-]?to[\s_-]?join|joining[\s_-]?time|joining[\s_-]?date|start[\s_-]?date/i.test(combinedText)) {
+    if (field.type === "date" || /date/i.test(combinedText)) {
+      return { value: new Date().toISOString().split("T")[0], reasoning: "Supplied today's date for available joining date" };
+    }
     if (field.options && field.options.length > 0) {
       const immOpt = field.options.find((o) => /immediate|0[\s_-]?days?|15[\s_-]?days?|<[\s_-]?1[\s_-]?month|less than/i.test(o.label));
       if (immOpt) {
@@ -201,6 +207,15 @@ function resolveContextualFallback(
       value: "Immediate",
       reasoning: "Candidate is ready for immediate joining",
     };
+  }
+
+  // 5.5 General Date input fallback
+  if (field.type === "date") {
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (/dob|birth/i.test(combinedText)) {
+      return { value: "2005-07-06", reasoning: "Supplied applicant date of birth" };
+    }
+    return { value: todayStr, reasoning: "Supplied valid ISO date for date field" };
   }
 
   // 6. Willingness / Relocation

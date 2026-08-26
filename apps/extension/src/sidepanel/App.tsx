@@ -232,6 +232,16 @@ export const App: React.FC = () => {
       case "personal.password":
       case "personal.confirmPassword":
         return (personal as any)?.password || "Password@12345";
+      case "documents.resume":
+        return savedResume?.filename || (userProfile as any)?.resumeFileName || `${personal.firstName || "Sanjeev"}_${personal.lastName || "Kumar"}_Resume.pdf`;
+      case "documents.secondaryMarksheet":
+        return (userProfile as any)?.secondaryMarksheetFileName || `${personal.firstName || "Sanjeev"}_${personal.lastName || "Kumar"}_10th_Marksheet.pdf`;
+      case "documents.higherSecondaryMarksheet":
+        return (userProfile as any)?.higherSecondaryMarksheetFileName || `${personal.firstName || "Sanjeev"}_${personal.lastName || "Kumar"}_12th_Marksheet.pdf`;
+      case "documents.collegeTranscript":
+        return (userProfile as any)?.transcriptFileName || `${personal.firstName || "Sanjeev"}_${personal.lastName || "Kumar"}_College_Transcript.pdf`;
+      case "documents.coverLetter":
+        return (userProfile as any)?.coverLetterFileName || `${personal.firstName || "Sanjeev"}_${personal.lastName || "Kumar"}_Cover_Letter.pdf`;
       default:
         return null;
     }
@@ -457,9 +467,13 @@ export const App: React.FC = () => {
             });
           }
 
+          const hasResumeInFields = allFields.some(
+            (f) => f.type === "file" || /resume|cv|curriculum|marksheet|transcript|cover[\s_-]?letter|upload/i.test(f.rawLabel)
+          );
+
           setFields(allFields);
           setClosedRootsCount(totalClosedRoots);
-          setHasResumeField(hasResume);
+          setHasResumeField(hasResume || hasResumeInFields);
 
           // 1. Map fields deterministically from user profile
           const initialMappings: FieldMapping[] = allFields.map((f) => {
@@ -1002,8 +1016,29 @@ export const App: React.FC = () => {
                     </span>
                   </div>
 
+                  {/* File Upload Field Display */}
+                  {field.type === "file" && (
+                    <div className="mt-1.5 p-2 bg-indigo-950/30 border border-indigo-800/40 rounded-lg flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-indigo-300 font-mono text-[11px] truncate flex-1">
+                        <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <span className="truncate">{String(valueToFill || activeResumeDisplayName)}</span>
+                        <span className="px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 text-[9px] font-bold shrink-0">
+                          Ready
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleUploadResumeOnly}
+                        disabled={isUploadingResume}
+                        className="text-[10px] px-2 py-0.5 bg-indigo-900/70 hover:bg-indigo-800 active:scale-95 text-indigo-200 border border-indigo-700/50 rounded font-medium shrink-0 cursor-pointer transition flex items-center gap-1"
+                      >
+                        <Upload className="w-3 h-3" />
+                        <span>{isUploadingResume ? "Uploading..." : "Upload"}</span>
+                      </button>
+                    </div>
+                  )}
+
                   {/* Text / Number Input Editable Field */}
-                  {field.type !== "select" && (
+                  {field.type !== "select" && field.type !== "file" && (
                     <div className="mt-1.5">
                       <input
                         type="text"

@@ -34,8 +34,8 @@ export async function logAudit(params: LogAuditParams): Promise<void> {
         targetId: params.targetId,
       },
     });
-  } catch (err) {
-    console.warn("Could not write audit log to database:", err);
+  } catch (err: any) {
+    console.warn("Could not write audit log to database:", err?.message || err);
   }
 }
 
@@ -59,7 +59,7 @@ export async function logAIInteraction(params: LogAIInteractionParams): Promise<
         errorCode: params.errorCode,
       },
     });
-  } catch (err) {
-    console.warn("Could not write AI interaction log to database:", err);
+  } catch (err: any) {
+    console.warn("Could not write AI interaction log to database:", err?.message || err);
   }
 }

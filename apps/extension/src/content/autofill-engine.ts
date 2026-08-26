@@ -329,15 +329,21 @@ export async function executeAutofill(
             else correctedVal = "0";
           }
           // 2i. Notice Period / Availability
-          else if (/notice|availability/i.test(combinedText)) {
-            const optMatch = optionsList.find((o) => /immediate|0[\s_-]?days?|15[\s_-]?days?|<[\s_-]?1[\s_-]?month/i.test(o.text)) || optionsList[1];
-            if (optMatch) correctedVal = optMatch.value || optMatch.text;
-            else correctedVal = "Immediate Joiner";
+          else if (/notice|availability|joining|start[\s_-]?date/i.test(combinedText)) {
+            if (targetEl instanceof HTMLInputElement && targetEl.type === "date") {
+              correctedVal = new Date().toISOString().split("T")[0];
+            } else {
+              const optMatch = optionsList.find((o) => /immediate|0[\s_-]?days?|15[\s_-]?days?|<[\s_-]?1[\s_-]?month/i.test(o.text)) || optionsList[1];
+              if (optMatch) correctedVal = optMatch.value || optMatch.text;
+              else correctedVal = "Immediate Joiner";
+            }
           }
         }
         // 3. Required text / number / boolean / select fields
         else if (warnText.includes("required") || warnText.includes("blank") || warnText.includes("empty") || warnText.includes("property")) {
-          if (targetEl instanceof HTMLSelectElement) {
+          if (targetEl instanceof HTMLInputElement && targetEl.type === "date") {
+            correctedVal = /dob|birth/i.test(combinedText) ? "2005-07-06" : new Date().toISOString().split("T")[0];
+          } else if (targetEl instanceof HTMLSelectElement) {
             if (/\bmonths?\b/i.test(combinedText)) {
               correctedVal = "0 months";
             } else if (/\byears?\b/i.test(combinedText)) {

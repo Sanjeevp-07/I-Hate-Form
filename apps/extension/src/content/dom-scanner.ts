@@ -2,6 +2,7 @@ import { FieldDescriptor } from "@internship-copilot/types";
 import { querySelectorAllDeepWithStats } from "./shadow-dom-walker";
 import { extractFieldDescriptor } from "./field-detector";
 import { FrameRegistry } from "./frame-registry";
+import { isFileInputActive } from "./resume-uploader";
 
 export interface ScanResultWithStats {
   frameId: number;
@@ -21,6 +22,12 @@ const FORM_ELEMENTS_SELECTOR = [
   '[role="spinbutton"]',
   '[contenteditable="true"]',
   '[contenteditable=""]',
+  '[role="button"][aria-label*="Add file" i]',
+  '[role="button"][aria-label*="Add File" i]',
+  '[role="button"][aria-label*="Upload" i]',
+  '.Qr7Oae [role="button"]',
+  'div[class*="dropzone"]',
+  'div[class*="file-upload"]',
 ].join(", ");
 
 export function scanFormFieldsWithStats(): ScanResultWithStats {
@@ -37,10 +44,28 @@ export function scanFormFieldsWithStats(): ScanResultWithStats {
     }
     visitedElements.add(element);
 
-    // Skip non-data input types
+    // Skip non-data input types (except file inputs)
     if (element instanceof HTMLInputElement) {
       const type = (element.type || "text").toLowerCase();
       if (["hidden", "submit", "button", "reset", "image"].includes(type)) {
+        return;
+      }
+    }
+
+    // Filter out non-file buttons that matched generic selectors
+    if (element.getAttribute("role") === "button" || element.tagName.toLowerCase() === "button") {
+      const ariaLabel = (element.getAttribute("aria-label") || "").toLowerCase();
+      const text = (element.textContent || "").toLowerCase();
+      const parentListItem = element.closest('.Qr7Oae, [role="listitem"], .geS5n');
+      const isGoogleFormsAddFile = parentListItem && (
+        ariaLabel.includes("add file") ||
+        text.includes("add file") ||
+        parentListItem.textContent?.toLowerCase().includes("upload 1 supported file") ||
+        parentListItem.textContent?.toLowerCase().includes("supported file")
+      );
+      const isUploadBtn = ariaLabel.includes("add file") || ariaLabel.includes("upload") || text.includes("add file") || text.includes("upload resume") || text.includes("upload cv");
+      
+      if (!isGoogleFormsAddFile && !isUploadBtn) {
         return;
       }
     }
@@ -51,18 +76,27 @@ export function scanFormFieldsWithStats(): ScanResultWithStats {
       )
     );
 
-    // Check visibility
-    const style = window.getComputedStyle(element);
-    const isStrictlyHidden = style.display === "none" || style.visibility === "hidden";
+    const isFileInput = element instanceof HTMLInputElement && element.type === "file";
 
-    if (isStrictlyHidden) {
-      // If it's strictly hidden and has no dimensions, check if it's aria-hidden or truly inactive
-      const rects = element.getClientRects();
-      if (rects.length === 0 && !isInsideModal && !element.getAttribute("aria-hidden")) {
+    // For file inputs: custom ATS forms hide native <input type="file"> via display:none or opacity:0.
+    // As long as the file input is active (not inside a hidden wizard step), don't discard it.
+    if (isFileInput) {
+      if (!isFileInputActive(element)) {
         return;
       }
-      if (element.getAttribute("aria-hidden") === "true" && rects.length === 0) {
-        return;
+    } else {
+      // Check visibility for standard elements
+      const style = window.getComputedStyle(element);
+      const isStrictlyHidden = style.display === "none" || style.visibility === "hidden";
+
+      if (isStrictlyHidden) {
+        const rects = element.getClientRects();
+        if (rects.length === 0 && !isInsideModal && !element.getAttribute("aria-hidden")) {
+          return;
+        }
+        if (element.getAttribute("aria-hidden") === "true" && rects.length === 0) {
+          return;
+        }
       }
     }
 
