@@ -361,4 +361,164 @@ describe("Phase 9: Google Forms Compatibility & Autofill", () => {
     expect(autofillResult.resumeUpload?.uploaded).toBe(true);
     expect(autofillResult.resumeUpload?.fileName).toContain("Resume.pdf");
   });
+
+  it("Scans, maps, and autofills Google Forms Radio (Year of Study) and Checkbox (Area of Interest) questions", async () => {
+    document.body.innerHTML = `
+      <form class="freebirdFormviewerViewFormCard">
+        <!-- Question 1: Year of Study (Radio Button Question) -->
+        <div role="listitem" class="Qr7Oae">
+          <div class="geS5n">
+            <div id="i1" class="M7eMe" role="heading">Year of Study</div>
+            <div class="v3duvd">*</div>
+            <div role="radiogroup" aria-labelledby="i1" class="SGkqec">
+              <div class="nWQGrd zwllIb">
+                <label class="docssharedWizTogglelabeledContainer">
+                  <div class="appsMaterialWizToggleRadiogroupEl">
+                    <div role="radio" aria-checked="false" data-value="1st Year" aria-label="1st Year" class="docssharedWizTogglelabeledRadio"></div>
+                  </div>
+                  <div class="aDTYNe snByac"><span class="M7eMe">1st Year</span></div>
+                </label>
+              </div>
+              <div class="nWQGrd zwllIb">
+                <label class="docssharedWizTogglelabeledContainer">
+                  <div class="appsMaterialWizToggleRadiogroupEl">
+                    <div role="radio" aria-checked="false" data-value="2nd Year" aria-label="2nd Year" class="docssharedWizTogglelabeledRadio"></div>
+                  </div>
+                  <div class="aDTYNe snByac"><span class="M7eMe">2nd Year</span></div>
+                </label>
+              </div>
+              <div class="nWQGrd zwllIb">
+                <label class="docssharedWizTogglelabeledContainer">
+                  <div class="appsMaterialWizToggleRadiogroupEl">
+                    <div role="radio" aria-checked="false" data-value="3rd Year" aria-label="3rd Year" class="docssharedWizTogglelabeledRadio"></div>
+                  </div>
+                  <div class="aDTYNe snByac"><span class="M7eMe">3rd Year</span></div>
+                </label>
+              </div>
+              <div class="nWQGrd zwllIb">
+                <label class="docssharedWizTogglelabeledContainer">
+                  <div class="appsMaterialWizToggleRadiogroupEl">
+                    <div role="radio" aria-checked="false" data-value="4th Year" aria-label="4th Year" class="docssharedWizTogglelabeledRadio"></div>
+                  </div>
+                  <div class="aDTYNe snByac"><span class="M7eMe">4th Year</span></div>
+                </label>
+              </div>
+              <div class="nWQGrd zwllIb">
+                <label class="docssharedWizTogglelabeledContainer">
+                  <div class="appsMaterialWizToggleRadiogroupEl">
+                    <div role="radio" aria-checked="false" data-value="Postgraduate" aria-label="Postgraduate" class="docssharedWizTogglelabeledRadio"></div>
+                  </div>
+                  <div class="aDTYNe snByac"><span class="M7eMe">Postgraduate</span></div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Question 2: Area(s) of Interest (Checkbox Question) -->
+        <div role="listitem" class="Qr7Oae">
+          <div class="geS5n">
+            <div id="i10" class="M7eMe" role="heading">Area(s) of Interest</div>
+            <div class="v3duvd">*</div>
+            <div role="group" aria-labelledby="i10" class="Y62e3c">
+              <div class="e3Duub">
+                <label class="docssharedWizTogglelabeledContainer">
+                  <div class="uHMk8b">
+                    <div role="checkbox" aria-checked="false" data-answer-value="Technology / IT" aria-label="Technology / IT"></div>
+                  </div>
+                  <div class="aDTYNe snByac"><span class="M7eMe">Technology / IT</span></div>
+                </label>
+              </div>
+              <div class="e3Duub">
+                <label class="docssharedWizTogglelabeledContainer">
+                  <div class="uHMk8b">
+                    <div role="checkbox" aria-checked="false" data-answer-value="Business & Management" aria-label="Business & Management"></div>
+                  </div>
+                  <div class="aDTYNe snByac"><span class="M7eMe">Business & Management</span></div>
+                </label>
+              </div>
+              <div class="e3Duub">
+                <label class="docssharedWizTogglelabeledContainer">
+                  <div class="uHMk8b">
+                    <div role="checkbox" aria-checked="false" data-answer-value="Finance" aria-label="Finance"></div>
+                  </div>
+                  <div class="aDTYNe snByac"><span class="M7eMe">Finance</span></div>
+                </label>
+              </div>
+              <div class="e3Duub">
+                <label class="docssharedWizTogglelabeledContainer">
+                  <div class="uHMk8b">
+                    <div role="checkbox" aria-checked="false" data-answer-value="Design" aria-label="Design"></div>
+                  </div>
+                  <div class="aDTYNe snByac"><span class="M7eMe">Design</span></div>
+                </label>
+              </div>
+              <div class="e3Duub">
+                <label class="docssharedWizTogglelabeledContainer">
+                  <div class="uHMk8b">
+                    <div role="checkbox" aria-checked="false" data-answer-value="Engineering" aria-label="Engineering"></div>
+                  </div>
+                  <div class="aDTYNe snByac"><span class="M7eMe">Engineering</span></div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+    `;
+
+    const fields = scanFormFields();
+    expect(fields.length).toBe(2);
+
+    expect(fields[0].rawLabel).toContain("Year of Study");
+    expect(fields[0].type).toBe("radio");
+    expect(fields[0].options).toBeDefined();
+    expect(fields[0].options?.length).toBe(5);
+    expect(fields[0].options?.map((o) => o.label)).toEqual([
+      "1st Year",
+      "2nd Year",
+      "3rd Year",
+      "4th Year",
+      "Postgraduate",
+    ]);
+
+    expect(fields[1].rawLabel).toContain("Area(s) of Interest");
+    expect(fields[1].type).toBe("checkbox");
+    expect(fields[1].options).toBeDefined();
+    expect(fields[1].options?.length).toBe(5);
+    expect(fields[1].options?.map((o) => o.label)).toEqual([
+      "Technology / IT",
+      "Business & Management",
+      "Finance",
+      "Design",
+      "Engineering",
+    ]);
+
+    const mappedYear = mapFieldDeterministically(fields[0], mockProfile);
+    const mappedInterests = mapFieldDeterministically(fields[1], mockProfile);
+
+    expect(mappedYear.profilePath).toBe("education.currentYear");
+    expect(mappedYear.valueToFill).toBe("3rd Year");
+
+    expect(mappedInterests.profilePath).toBe("work.interests");
+    expect(mappedInterests.valueToFill).toBe("Technology / IT, Engineering");
+
+    const mappings = [mappedYear, mappedInterests];
+    const autofillResult = await executeAutofill(fields, mappings, mockProfile);
+
+    expect(autofillResult.filledFieldIds.length).toBe(2);
+
+    // Verify 3rd Year radio button is checked
+    const thirdYearRadio = document.querySelector('[role="radio"][data-value="3rd Year"]') as HTMLElement;
+    expect(thirdYearRadio.getAttribute("aria-checked")).toBe("true");
+
+    // Verify Technology / IT and Engineering checkboxes are checked
+    const techCheckbox = document.querySelector('[role="checkbox"][data-answer-value="Technology / IT"]') as HTMLElement;
+    const engCheckbox = document.querySelector('[role="checkbox"][data-answer-value="Engineering"]') as HTMLElement;
+    const financeCheckbox = document.querySelector('[role="checkbox"][data-answer-value="Finance"]') as HTMLElement;
+
+    expect(techCheckbox.getAttribute("aria-checked")).toBe("true");
+    expect(engCheckbox.getAttribute("aria-checked")).toBe("true");
+    expect(financeCheckbox.getAttribute("aria-checked")).toBe("false");
+  });
 });

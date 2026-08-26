@@ -1,6 +1,12 @@
 import { FieldDescriptor } from "@internship-copilot/types";
 import { querySelectorAllDeepWithStats } from "./shadow-dom-walker";
-import { extractFieldDescriptor } from "./field-detector";
+import {
+  extractFieldDescriptor,
+  getQuestionCardContainer,
+  findQuestionHeadingInContainer,
+  extractOptionsFromContainer,
+  normalizeLabel,
+} from "./field-detector";
 import { FrameRegistry } from "./frame-registry";
 import { isFileInputActive } from "./resume-uploader";
 
@@ -20,6 +26,12 @@ const FORM_ELEMENTS_SELECTOR = [
   '[role="combobox"]',
   '[role="searchbox"]',
   '[role="spinbutton"]',
+  '[role="radiogroup"]',
+  '[role="group"]',
+  '[role="radio"]',
+  '[role="checkbox"]',
+  '.SGkqec',
+  '.Y62e3c',
   '[contenteditable="true"]',
   '[contenteditable=""]',
   '[role="button"][aria-label*="Add file" i]',
@@ -37,6 +49,7 @@ export function scanFormFieldsWithStats(): ScanResultWithStats {
   );
   const descriptors: FieldDescriptor[] = [];
   const visitedElements = new Set<HTMLElement>();
+  const scannedGroupContainers = new Set<HTMLElement>();
 
   matchedElements.forEach((element) => {
     if (visitedElements.has(element)) {
@@ -50,6 +63,67 @@ export function scanFormFieldsWithStats(): ScanResultWithStats {
       if (["hidden", "submit", "button", "reset", "image"].includes(type)) {
         return;
       }
+    }
+
+    const role = element.getAttribute("role");
+
+    // 1. Unified Radio and Checkbox Question Card Handling
+    const isRadioOrCheckbox =
+      (element instanceof HTMLInputElement && (element.type === "radio" || element.type === "checkbox")) ||
+      role === "radio" ||
+      role === "checkbox" ||
+      role === "radiogroup" ||
+      role === "group" ||
+      element.classList.contains("SGkqec") ||
+      element.classList.contains("Y62e3c");
+
+    if (isRadioOrCheckbox) {
+      const questionCard = getQuestionCardContainer(element);
+
+      if (scannedGroupContainers.has(questionCard)) {
+        return;
+      }
+      scannedGroupContainers.add(questionCard);
+
+      const radioCount = questionCard.querySelectorAll('[role="radio"], input[type="radio"]').length;
+      const checkboxCount = questionCard.querySelectorAll('[role="checkbox"], input[type="checkbox"]').length;
+
+      // Mark all inner option elements and toggle containers as visited
+      questionCard
+        .querySelectorAll(
+          '[role="radio"], [role="checkbox"], input[type="radio"], input[type="checkbox"], .docssharedWizTogglelabeledContainer, .nWQGrd, .e3Duub, .appsMaterialWizToggleRadiogroupEl, .appsMaterialWizToggleCheckboxEl, .uHMk8b'
+        )
+        .forEach((child) => {
+          if (child instanceof HTMLElement) visitedElements.add(child);
+        });
+
+      const targetGroupEl = (questionCard.querySelector('[role="radiogroup"], [role="group"], .SGkqec, .Y62e3c') || questionCard) as HTMLElement;
+      const descriptor = extractFieldDescriptor(targetGroupEl, descriptors.length);
+
+      if (radioCount > 0) {
+        descriptor.type = "radio";
+      } else if (checkboxCount > 0) {
+        descriptor.type = "checkbox";
+      }
+
+      const questionTitle = findQuestionHeadingInContainer(questionCard);
+      if (questionTitle) {
+        descriptor.rawLabel = questionTitle;
+        descriptor.normalizedLabel = normalizeLabel(questionTitle);
+      }
+
+      descriptor.options = extractOptionsFromContainer(questionCard, descriptor.type);
+
+      try {
+        targetGroupEl.setAttribute("data-ihateform-id", descriptor.id);
+        questionCard.setAttribute("data-ihateform-id", descriptor.id);
+        questionCard
+          .querySelectorAll('[role="radio"], [role="checkbox"], input[type="radio"], input[type="checkbox"]')
+          .forEach((c) => c.setAttribute("data-ihateform-id", descriptor.id));
+      } catch {}
+
+      descriptors.push(descriptor);
+      return;
     }
 
     // Filter out non-file buttons that matched generic selectors

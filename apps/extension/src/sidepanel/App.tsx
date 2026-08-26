@@ -242,6 +242,8 @@ export const App: React.FC = () => {
         return (userProfile as any)?.transcriptFileName || `${personal.firstName || "Sanjeev"}_${personal.lastName || "Kumar"}_College_Transcript.pdf`;
       case "documents.coverLetter":
         return (userProfile as any)?.coverLetterFileName || `${personal.firstName || "Sanjeev"}_${personal.lastName || "Kumar"}_Cover_Letter.pdf`;
+      case "work.interests":
+        return "Technology / IT, Engineering";
       default:
         return null;
     }
@@ -281,6 +283,35 @@ export const App: React.FC = () => {
   };
 
   const [isGeneratingAI, setIsGeneratingAI] = useState<boolean>(false);
+
+  const handleToggleCheckboxOption = (fieldIndex: number, optionValue: string) => {
+    setMappings((prev) => {
+      const updated = [...prev];
+      if (updated[fieldIndex]) {
+        const currentVal = String(updated[fieldIndex].valueToFill || "");
+        const currentItems = currentVal.split(/[,;|\n]/).map((s) => s.trim()).filter(Boolean);
+        const lowerItems = currentItems.map((s) => s.toLowerCase());
+        const targetLower = optionValue.toLowerCase().trim();
+
+        let newItems: string[];
+        if (lowerItems.includes(targetLower)) {
+          newItems = currentItems.filter((s) => s.toLowerCase() !== targetLower);
+        } else {
+          newItems = [...currentItems, optionValue];
+        }
+
+        const newValue = newItems.join(", ");
+        updated[fieldIndex] = {
+          ...updated[fieldIndex],
+          valueToFill: newValue,
+          action: newValue ? "fill" : "review",
+          confidence: Math.max(updated[fieldIndex].confidence, 0.95),
+          source: "user_override",
+        };
+      }
+      return updated;
+    });
+  };
 
   const handleOptionOverride = (fieldIndex: number, newValue: string) => {
     setMappings((prev) => {
@@ -1050,11 +1081,11 @@ export const App: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Dropdown Options Selector */}
-                  {field.type === "select" && field.options && field.options.length > 0 && (
+                  {/* Dropdown / Radio Options Selector */}
+                  {(field.type === "select" || field.type === "radio") && field.options && field.options.length > 0 && (
                     <div className="mt-2 pt-1.5 border-t border-slate-800/60">
                       <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                        <span>Dropdown Options ({field.options.length}):</span>
+                        <span>{field.type === "radio" ? "Radio Options" : "Dropdown Options"} ({field.options.length}):</span>
                       </div>
                       <div className="relative">
                         <select
@@ -1063,7 +1094,9 @@ export const App: React.FC = () => {
                             field.options.find(
                               (opt) =>
                                 opt.value.toLowerCase() === String(valueToFill).toLowerCase() ||
-                                opt.label.toLowerCase() === String(valueToFill).toLowerCase()
+                                opt.label.toLowerCase() === String(valueToFill).toLowerCase() ||
+                                String(valueToFill).toLowerCase().includes(opt.label.toLowerCase()) ||
+                                opt.label.toLowerCase().includes(String(valueToFill).toLowerCase())
                             )?.value || ""
                           }
                           onChange={(e) => {
@@ -1079,6 +1112,43 @@ export const App: React.FC = () => {
                           ))}
                         </select>
                         <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-2 pointer-events-none" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Multi-Select Checkbox Options Selector */}
+                  {field.type === "checkbox" && field.options && field.options.length > 0 && (
+                    <div className="mt-2 pt-1.5 border-t border-slate-800/60">
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1.5">
+                        <span>Select Choices ({field.options.length} options):</span>
+                        <span className="text-[9px] text-indigo-400">Click to toggle</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto custom-scrollbar p-1.5 bg-slate-950/70 rounded-lg border border-slate-800/60">
+                        {field.options.map((opt, optIdx) => {
+                          const isSelected = String(valueToFill || "")
+                            .toLowerCase()
+                            .includes(opt.label.toLowerCase()) ||
+                            String(valueToFill || "")
+                              .toLowerCase()
+                              .includes(opt.value.toLowerCase());
+                          return (
+                            <button
+                              key={optIdx}
+                              type="button"
+                              onClick={() => handleToggleCheckboxOption(idx, opt.label || opt.value)}
+                              className={`text-[10px] px-2 py-0.5 rounded border transition flex items-center gap-1 cursor-pointer select-none ${
+                                isSelected
+                                  ? "bg-emerald-950/90 text-emerald-300 border-emerald-600/80 font-medium shadow-sm shadow-emerald-950"
+                                  : "bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800"
+                              }`}
+                            >
+                              <span className={`w-2.5 h-2.5 rounded-sm border flex items-center justify-center text-[8px] font-bold ${isSelected ? "border-emerald-400 bg-emerald-500 text-slate-950" : "border-slate-600"}`}>
+                                {isSelected ? "✓" : ""}
+                              </span>
+                              <span>{opt.label || opt.value}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

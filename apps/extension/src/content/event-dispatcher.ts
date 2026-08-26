@@ -300,32 +300,121 @@ export function setNativeValue(
       element.getAttribute("role") === "radiogroup" ||
       element.getAttribute("role") === "group" ||
       element.getAttribute("role") === "radio" ||
-      element.getAttribute("role") === "checkbox"
+      element.getAttribute("role") === "checkbox" ||
+      element.classList.contains("SGkqec") ||
+      element.classList.contains("Y62e3c") ||
+      Boolean(element.querySelector('[role="radio"], [role="checkbox"], input[type="radio"], input[type="checkbox"]'))
     ) {
-      const strVal = String(value).toLowerCase().trim();
-      const options = Array.from(
-        element.querySelectorAll(
-          '[role="radio"], [role="checkbox"], .docssharedWizToggleLabeledContainer, .appsMaterialWizToggleRadiogroupEl, .appsMaterialWizToggleCheckboxEl'
+      const targetValues = Array.isArray(value)
+        ? value.map(String)
+        : typeof value === "string"
+        ? value.split(/[,;|\n]/).map((s) => s.trim()).filter(Boolean)
+        : [String(value)];
+
+      const questionCard = element.closest('.Qr7Oae, .geS5n, [role="listitem"], fieldset, .form-group') || element;
+      const roleElements = Array.from(
+        questionCard.querySelectorAll(
+          '[role="radio"], [role="checkbox"], input[type="radio"], input[type="checkbox"]'
         )
       );
-      const matchingOpt = options.find((opt) => {
-        const optVal = (
-          opt.getAttribute("data-value") ||
-          opt.getAttribute("data-answer-value") ||
-          opt.getAttribute("aria-label") ||
-          opt.textContent ||
-          ""
-        ).toLowerCase().trim();
-        return optVal === strVal || optVal.includes(strVal) || strVal.includes(optVal);
-      });
-      if (matchingOpt instanceof HTMLElement) {
-        matchingOpt.click();
-        matchingOpt.setAttribute("aria-checked", "true");
-        matchingOpt.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-        matchingOpt.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-        matchingOpt.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-        matchingOpt.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+      const allOptionElements = roleElements.length > 0
+        ? roleElements
+        : Array.from(
+            questionCard.querySelectorAll(
+              '.docssharedWizTogglelabeledContainer, .nWQGrd, .e3Duub, .appsMaterialWizToggleRadiogroupEl, .appsMaterialWizToggleCheckboxEl'
+            )
+          );
+
+      for (const targetVal of targetValues) {
+        const cleanTarget = targetVal.toLowerCase().trim();
+        if (!cleanTarget) continue;
+
+        const matchingOpt = allOptionElements.find((opt) => {
+          const optVal = (
+            opt.getAttribute("data-value") ||
+            opt.getAttribute("data-answer-value") ||
+            opt.getAttribute("value") ||
+            opt.getAttribute("aria-label") ||
+            ""
+          ).toLowerCase().trim();
+
+          const labelParent = opt.closest(".docssharedWizTogglelabeledContainer, label, .nWQGrd, .e3Duub, .appsMaterialWizToggleRadiogroupEl, .appsMaterialWizToggleCheckboxEl") || opt.parentElement;
+          const labelText = (
+            labelParent?.querySelector(".aDTYNe, .M7eMe, span.M7eMe, span, label, p")?.textContent ||
+            labelParent?.textContent ||
+            ""
+          ).toLowerCase().trim();
+
+          const cleanOpt = optVal || labelText;
+          if (!cleanOpt) return false;
+
+          // 1. Exact match
+          if (cleanOpt === cleanTarget || optVal === cleanTarget || labelText === cleanTarget) {
+            return true;
+          }
+
+          // 2. Normalized alphanumeric match (e.g. "3rd year" === "3rd year", "technology / it" === "technology / it")
+          const normOpt = cleanOpt.replace(/[^\w]/g, "");
+          const normTarget = cleanTarget.replace(/[^\w]/g, "");
+          if (normOpt && normTarget && normOpt === normTarget) {
+            return true;
+          }
+
+          // 3. Substring match only if length >= 4 and starts/ends with target
+          if (normOpt.length >= 4 && normTarget.length >= 4) {
+            if (normOpt.startsWith(normTarget) || normTarget.startsWith(normOpt)) {
+              return true;
+            }
+          }
+
+          return false;
+        });
+
+        if (matchingOpt instanceof HTMLElement) {
+          const actualControl = (matchingOpt.matches('[role="radio"], [role="checkbox"], input')
+            ? matchingOpt
+            : matchingOpt.querySelector('[role="radio"], [role="checkbox"], input')) as HTMLElement || matchingOpt;
+
+          const toggleContainer = matchingOpt.closest(".docssharedWizTogglelabeledContainer, label") as HTMLElement | null;
+
+          try {
+            actualControl.click();
+          } catch {}
+
+          if (toggleContainer && toggleContainer !== actualControl) {
+            try {
+              toggleContainer.click();
+            } catch {}
+          }
+
+          actualControl.setAttribute("aria-checked", "true");
+          matchingOpt.setAttribute("aria-checked", "true");
+          if (actualControl instanceof HTMLInputElement) {
+            actualControl.checked = true;
+          }
+
+          try {
+            actualControl.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+            actualControl.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+            actualControl.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+            actualControl.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+            actualControl.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+          } catch {}
+
+          if (toggleContainer) {
+            try {
+              toggleContainer.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+              toggleContainer.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+            } catch {}
+          }
+        }
       }
+
+      applyGoogleFormsState(element, String(value));
+      return {
+        success: true,
+        valueRegistered: true,
+      };
     } else if (element instanceof HTMLSelectElement) {
       const matchResult = findBestOptionMatch(
         Array.from(element.options),

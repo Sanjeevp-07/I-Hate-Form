@@ -52,22 +52,52 @@ function isValidLabelText(text: string, el?: Element | null): boolean {
   return true;
 }
 
+export function getQuestionCardContainer(element: HTMLElement): HTMLElement {
+  const structuredCard = element.closest(
+    '.Qr7Oae, [role="listitem"], .geS5n, .freebirdFormviewerViewNumberedItemContainer, fieldset, .form-group, .field-wrapper, .form-field'
+  ) as HTMLElement | null;
+
+  if (structuredCard) {
+    return structuredCard;
+  }
+
+  const groupEl = element.closest(
+    '[role="radiogroup"], [role="group"], .SGkqec, .Y62e3c'
+  ) as HTMLElement | null;
+
+  if (groupEl) {
+    return groupEl;
+  }
+
+  return (element.closest('div[class*="form"], div[class*="field"]') || element) as HTMLElement;
+}
+
+export function findQuestionHeadingInContainer(container: HTMLElement): string | null {
+  const headings = Array.from(
+    container.querySelectorAll('.M7eMe, [role="heading"], legend, div.HoPnR, h1, h2, h3, h4, h5, h6, .label, [class*="title"], [class*="label"], [class*="header"], label')
+  );
+  for (const h of headings) {
+    if (
+      h.closest(
+        '.docssharedWizTogglelabeledContainer, .nWQGrd, .e3Duub, .aDTYNe, .uHMk8b, .appsMaterialWizToggleRadiogroupEl, .appsMaterialWizToggleCheckboxEl, .select-option, .dropdown-menu'
+      )
+    ) {
+      continue;
+    }
+    const txt = cleanLabelText(h.textContent || "");
+    if (txt && isValidLabelText(txt, h as HTMLElement)) {
+      return txt;
+    }
+  }
+  return null;
+}
+
 function findLabelForElement(element: HTMLElement): string {
   // 1. Google Forms / Question Container Heading (Highest priority for structured forms)
-  const container = element.closest(
-    '.Qr7Oae, [role="listitem"], .geS5n, .freebirdFormviewerViewNumberedItemContainer, .form-group, .field-wrapper, .field, .form-field, .field-item, div[class*="form"], div[class*="field"], div[class*="group"], div[class*="select"], div[class*="item"], div[class*="input"], div[class*="row"], div[class*="col"], fieldset'
-  );
+  const container = getQuestionCardContainer(element);
   if (container) {
-    // Check for question heading (Google Forms .M7eMe, [role="heading"], legend)
-    const headingEl = container.querySelector(
-      '.M7eMe, span.M7eMe, div.HoPnR, [role="heading"], legend, label, .label, [class*="label"], [class*="title"], [class*="header"], span, p, div'
-    );
-    if (headingEl && headingEl !== element && !headingEl.contains(element) && !element.parentElement?.contains(headingEl)) {
-      const txt = cleanLabelText(headingEl.textContent || "");
-      if (isValidLabelText(txt, headingEl)) {
-        return txt;
-      }
-    }
+    const headingText = findQuestionHeadingInContainer(container);
+    if (headingText) return headingText;
   }
 
   // 2. Associated label via htmlFor within the same root node (document or ShadowRoot)
@@ -168,7 +198,7 @@ function findNearbyText(element: HTMLElement): string {
   return parent.textContent ? parent.textContent.slice(0, 100).trim() : "";
 }
 
-function normalizeLabel(label: string): string {
+export function normalizeLabel(label: string): string {
   let cleaned = label
     .toLowerCase()
     .replace(/[*:]/g, "")
@@ -198,8 +228,14 @@ function determineElementType(element: HTMLElement): FormElementType {
   const role = element.getAttribute("role");
   if (role === "textbox" || role === "searchbox" || role === "spinbutton") return "text";
   if (role === "combobox" || role === "listbox") return "select";
+  if (role === "radiogroup" || role === "radio" || element.classList.contains("SGkqec")) return "radio";
   if (role === "checkbox") return "checkbox";
-  if (role === "radio") return "radio";
+  if (role === "group" || element.classList.contains("Y62e3c")) {
+    if (element.querySelector('[role="radio"], input[type="radio"], .appsMaterialWizToggleRadiogroupEl')) {
+      return "radio";
+    }
+    return "checkbox";
+  }
   if (element.getAttribute("contenteditable") === "true" || element.getAttribute("contenteditable") === "") {
     return "textarea";
   }
@@ -227,7 +263,69 @@ function determineElementType(element: HTMLElement): FormElementType {
     return "file";
   }
 
+  // Check for radio or checkbox group inside list item
+  if (parentListItem) {
+    if (parentListItem.querySelector('[role="radiogroup"], [role="radio"], .SGkqec, .appsMaterialWizToggleRadiogroupEl')) {
+      return "radio";
+    }
+    if (parentListItem.querySelector('[role="checkbox"], .Y62e3c, .uHMk8b, .appsMaterialWizToggleCheckboxEl')) {
+      return "checkbox";
+    }
+  }
+
   return "unknown";
+}
+
+export function extractOptionsFromContainer(element: HTMLElement, type: FormElementType): FormSelectOption[] {
+  const options: FormSelectOption[] = [];
+  const visitedLabels = new Set<string>();
+
+  if (type === "select" && element instanceof HTMLSelectElement) {
+    return Array.from(element.options).map((opt) => ({
+      value: opt.value,
+      label: opt.text.trim(),
+    }));
+  }
+
+  // Look in element or closest container / card
+  const container = getQuestionCardContainer(element);
+
+  // 1. Google Forms & ARIA Radio/Checkbox options
+  const optionNodes = container.querySelectorAll(
+    '[role="radio"], [role="checkbox"], input[type="radio"], input[type="checkbox"], .docssharedWizTogglelabeledContainer, .nWQGrd, .e3Duub, .appsMaterialWizToggleRadiogroupEl, .appsMaterialWizToggleCheckboxEl, .uHMk8b'
+  );
+
+  optionNodes.forEach((node) => {
+    let val =
+      node.getAttribute("data-value") ||
+      node.getAttribute("data-answer-value") ||
+      node.getAttribute("value") ||
+      node.getAttribute("aria-label") ||
+      "";
+
+    const labelContainer = node.closest(".docssharedWizTogglelabeledContainer, label, .nWQGrd, .e3Duub, div") || node.parentElement;
+    const labelText = (
+      labelContainer?.querySelector(".aDTYNe, .M7eMe, span.M7eMe, span, label, p")?.textContent ||
+      labelContainer?.textContent ||
+      ""
+    ).trim();
+
+    const displayLabel = cleanLabelText(labelText || val);
+    const finalVal = val.trim() || displayLabel;
+
+    if (displayLabel && displayLabel.length >= 1 && displayLabel.length < 80 && !visitedLabels.has(displayLabel.toLowerCase())) {
+      // Ignore non-option text like "Your answer", asterisks, or system buttons
+      if (!/^(your[\s_-]?answer|\*|other:?|upload|submit|clear form)$/i.test(displayLabel)) {
+        visitedLabels.add(displayLabel.toLowerCase());
+        options.push({
+          value: finalVal,
+          label: displayLabel,
+        });
+      }
+    }
+  });
+
+  return options;
 }
 
 export function extractFieldDescriptor(element: HTMLElement, index: number): FieldDescriptor {
@@ -269,6 +367,8 @@ export function extractFieldDescriptor(element: HTMLElement, index: number): Fie
       value: opt.value,
       label: opt.text.trim(),
     }));
+  } else if (type === "radio" || type === "checkbox" || element.getAttribute("role") === "radiogroup" || element.getAttribute("role") === "group") {
+    options = extractOptionsFromContainer(element, type);
   }
 
   return {
@@ -283,7 +383,7 @@ export function extractFieldDescriptor(element: HTMLElement, index: number): Fie
     ariaLabel,
     autocomplete,
     nearbyText,
-    options,
+    options: options && options.length > 0 ? options : undefined,
     required,
     disabled,
     domSelector: selector,

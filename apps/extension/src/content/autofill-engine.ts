@@ -99,7 +99,7 @@ export async function executeAutofill(
   const pendingSelectRetries: Array<{ fieldDescriptor: FieldDescriptor; mapping: FieldMapping }> = [];
 
   const allDOMElements = querySelectorAllDeep(
-    "input, select, textarea, [role='textbox'], [role='combobox'], [role='searchbox'], [role='spinbutton'], [contenteditable='true'], [contenteditable='']"
+    "input, select, textarea, [role='textbox'], [role='combobox'], [role='searchbox'], [role='spinbutton'], [role='radiogroup'], [role='group'], [role='radio'], [role='checkbox'], .SGkqec, .Y62e3c, [contenteditable='true'], [contenteditable='']"
   ).filter((element) => {
     if (element instanceof HTMLInputElement) {
       const type = (element.type || "text").toLowerCase();

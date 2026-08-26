@@ -70,7 +70,7 @@ const DETERMINISTIC_RULES: RuleDefinition[] = [
   },
   {
     profilePath: "personal.address",
-    patterns: [/current[\s_-]?street/i, /locality/i, /area\b/i, /street[\s_-]?address/i, /address[\s_-]?1/i, /permanent[\s_-]?address/i, /home[\s_-]?address/i, /physical[\s_-]?address/i, /residential[\s_-]?address/i, /mailing[\s_-]?address/i, /^(\*|\s)*address(\*|\s)*$/i, /\b(street|home|physical|residential)[\s_-]?address\b/i, /^(\*|\s)*addr(\*|\s)*$/i],
+    patterns: [/current[\s_-]?street/i, /locality/i, /\b(street|residential|living)[\s_-]?area\b/i, /street[\s_-]?address/i, /address[\s_-]?1/i, /permanent[\s_-]?address/i, /home[\s_-]?address/i, /physical[\s_-]?address/i, /residential[\s_-]?address/i, /mailing[\s_-]?address/i, /^(\*|\s)*address(\*|\s)*$/i, /\b(street|home|physical|residential)[\s_-]?address\b/i, /^(\*|\s)*addr(\*|\s)*$/i],
     getValue: (p) => p.personal.address || null,
     confidence: 0.98,
   },
@@ -280,6 +280,20 @@ const DETERMINISTIC_RULES: RuleDefinition[] = [
       }
       return "React, TypeScript, Next.js, Node.js, Python, Tailwind CSS, Docker, PostgreSQL";
     },
+    confidence: 0.98,
+  },
+  {
+    profilePath: "work.interests",
+    patterns: [
+      /area(\(s\))?[\s_-]?of[\s_-]?interest/i,
+      /areas?[\s_-]?of[\s_-]?interest/i,
+      /fields?[\s_-]?of[\s_-]?interest/i,
+      /domain[\s_-]?interest/i,
+      /preferred[\s_-]?domain/i,
+      /areas?[\s_-]?interested/i,
+      /what[\s_-]?are[\s_-]?your[\s_-]?interests/i,
+    ],
+    getValue: () => "Technology / IT, Engineering",
     confidence: 0.98,
   },
   {
@@ -616,6 +630,22 @@ export function verifyAndCorrectFieldAnswers(
         correctedAnswers[field.id] = /major|branch/i.test(cleanLabel)
           ? education.major || "Computer Science and Engineering"
           : education.degree || "B.Tech";
+      }
+      continue;
+    }
+
+    // 4.5 Year of Study
+    if (/year[\s_-]?of[\s_-]?study|current[\s_-]?year/i.test(cleanLabel)) {
+      if (isNarrativeParagraph(strVal) || !strVal) {
+        correctedAnswers[field.id] = education.currentYear || "3rd Year";
+      }
+      continue;
+    }
+
+    // 4.6 Area of Interest
+    if (/area(\(s\))?[\s_-]?of[\s_-]?interest|areas?[\s_-]?of[\s_-]?interest|domain[\s_-]?interest/i.test(cleanLabel)) {
+      if (isNarrativeParagraph(strVal) || !strVal) {
+        correctedAnswers[field.id] = "Technology / IT, Engineering";
       }
       continue;
     }
