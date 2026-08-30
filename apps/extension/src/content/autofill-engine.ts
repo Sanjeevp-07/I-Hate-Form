@@ -111,6 +111,7 @@ export async function executeAutofill(
   });
 
   const filledValuesMap = new Map<string, string | boolean>();
+  const filledElements = new Set<HTMLElement>();
 
   // First pass: fill fields
   for (const mapping of prioritizedMappings) {
@@ -140,9 +141,15 @@ export async function executeAutofill(
       continue;
     }
 
+    if (filledElements.has(targetElement)) {
+      // Element was already populated by a preceding field mapping in this run
+      continue;
+    }
+
     const dispatchResult = setNativeValue(targetElement, mapping.valueToFill as string | boolean);
 
     if (dispatchResult.success && dispatchResult.valueRegistered) {
+      filledElements.add(targetElement);
       result.filledFieldIds.push(mapping.fieldId);
       filledValuesMap.set(mapping.fieldId, mapping.valueToFill as string | boolean);
     } else {

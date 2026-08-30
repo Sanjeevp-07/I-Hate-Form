@@ -34,7 +34,12 @@ export function injectGoogleFormsHelperStyles() {
           display: none !important;
         }
       `;
-      (document.head || document.documentElement)?.appendChild(styleEl);
+      try {
+        const targetParent = document.head || document.documentElement;
+        if (targetParent) {
+          targetParent.appendChild(styleEl);
+        }
+      } catch {}
     }
   } catch {}
 }
@@ -42,65 +47,75 @@ export function injectGoogleFormsHelperStyles() {
 export function applyGoogleFormsState(element: HTMLElement, expectedValue: string) {
   if (!expectedValue) return;
 
-  injectGoogleFormsHelperStyles();
+  try {
+    injectGoogleFormsHelperStyles();
 
-  // 1. Mark all ancestor Google Form containers with CDNmEc (content present) and k3XOCb
-  let curr: HTMLElement | null = element;
-  while (curr && curr !== document.body) {
-    curr.classList.add("CDNmEc", "k3XOCb");
-    curr.classList.remove("T2vT6b", "has-error", "is-invalid", "N0PJr");
-    if (
-      curr.classList.contains("Qr7Oae") ||
-      curr.classList.contains("freebirdFormviewerViewNumberedItemContainer") ||
-      curr.classList.contains("freebirdFormviewerViewFormCard")
-    ) {
-      break;
+    // 1. Mark all ancestor Google Form containers with CDNmEc (content present) and k3XOCb
+    let curr: HTMLElement | null = element;
+    while (curr && curr !== document.body) {
+      try {
+        curr.classList.add("CDNmEc", "k3XOCb");
+        curr.classList.remove("T2vT6b", "has-error", "is-invalid", "N0PJr");
+      } catch {}
+      if (
+        curr.classList.contains("Qr7Oae") ||
+        curr.classList.contains("freebirdFormviewerViewNumberedItemContainer") ||
+        curr.classList.contains("freebirdFormviewerViewFormCard")
+      ) {
+        break;
+      }
+      curr = curr.parentElement;
     }
-    curr = curr.parentElement;
-  }
 
-  // 2. Hide Google Forms placeholder text element ("Your answer" / .ndJi5d / .wGQFbe)
-  const questionCard =
-    element.closest(
-      '.Qr7Oae, [role="listitem"], .freebirdFormviewerViewNumberedItemContainer, .freebirdFormviewerViewFormCard, .geS5n'
-    ) || element.parentElement;
+    // 2. Hide Google Forms placeholder text element ("Your answer" / .ndJi5d / .wGQFbe)
+    const questionCard =
+      element.closest(
+        '.Qr7Oae, [role="listitem"], .freebirdFormviewerViewNumberedItemContainer, .freebirdFormviewerViewFormCard, .geS5n'
+      ) || element.parentElement;
 
-  if (questionCard) {
-    // Target Google Forms placeholder elements
-    const placeholderEls = questionCard.querySelectorAll(
-      '.ndJi5d, .wGQFbe, div[class*="ndJi5d"], div[class*="placeholder"], span[class*="placeholder"], [data-placeholder]'
-    );
-    placeholderEls.forEach((p) => {
-      (p as HTMLElement).style.display = "none";
-      (p as HTMLElement).style.visibility = "hidden";
-      (p as HTMLElement).style.opacity = "0";
-      (p as HTMLElement).style.pointerEvents = "none";
-      p.setAttribute("aria-hidden", "true");
-    });
+    if (questionCard) {
+      // Target Google Forms placeholder elements
+      const placeholderEls = questionCard.querySelectorAll(
+        '.ndJi5d, .wGQFbe, div[class*="ndJi5d"], div[class*="placeholder"], span[class*="placeholder"], [data-placeholder]'
+      );
+      placeholderEls.forEach((p) => {
+        try {
+          (p as HTMLElement).style.display = "none";
+          (p as HTMLElement).style.visibility = "hidden";
+          (p as HTMLElement).style.opacity = "0";
+          (p as HTMLElement).style.pointerEvents = "none";
+          p.setAttribute("aria-hidden", "true");
+        } catch {}
+      });
 
-    // Target any node containing "Your answer" directly
-    const allDivs = questionCard.querySelectorAll("div, span, p");
-    allDivs.forEach((d) => {
-      if (d !== element && d.childElementCount === 0 && d.textContent?.trim().toLowerCase() === "your answer") {
-        (d as HTMLElement).style.display = "none";
-        (d as HTMLElement).style.visibility = "hidden";
-        (d as HTMLElement).style.opacity = "0";
-        (d as HTMLElement).style.pointerEvents = "none";
-        d.setAttribute("aria-hidden", "true");
-      }
-    });
+      // Target any node containing "Your answer" directly
+      const allDivs = questionCard.querySelectorAll("div, span, p");
+      allDivs.forEach((d) => {
+        try {
+          if (d !== element && d.childElementCount === 0 && d.textContent?.trim().toLowerCase() === "your answer") {
+            (d as HTMLElement).style.display = "none";
+            (d as HTMLElement).style.visibility = "hidden";
+            (d as HTMLElement).style.opacity = "0";
+            (d as HTMLElement).style.pointerEvents = "none";
+            d.setAttribute("aria-hidden", "true");
+          }
+        } catch {}
+      });
 
-    // Remove Google Form error messages ("This is a required question")
-    const errorAlerts = questionCard.querySelectorAll(
-      '.RBEWZc, .LXRPh, [role="alert"], div[jsname="ty0drd"]'
-    );
-    errorAlerts.forEach((ea) => {
-      const txt = (ea.textContent || "").toLowerCase();
-      if (txt.includes("required") || txt.includes("must") || txt.includes("valid") || ea.getAttribute("role") === "alert" || ea.classList.contains("RBEWZc")) {
-        (ea as HTMLElement).style.display = "none";
-      }
-    });
-  }
+      // Remove Google Form error messages ("This is a required question")
+      const errorAlerts = questionCard.querySelectorAll(
+        '.RBEWZc, .LXRPh, [role="alert"], div[jsname="ty0drd"]'
+      );
+      errorAlerts.forEach((ea) => {
+        try {
+          const txt = (ea.textContent || "").toLowerCase();
+          if (txt.includes("required") || txt.includes("must") || txt.includes("valid") || ea.getAttribute("role") === "alert" || ea.classList.contains("RBEWZc")) {
+            (ea as HTMLElement).style.display = "none";
+          }
+        } catch {}
+      });
+    }
+  } catch {}
 }
 
 /**
@@ -170,21 +185,21 @@ export function setNativeValue(
           }
         }
 
+        // Clear any previous text value first to prevent string concatenation
+        try {
+          element.value = "";
+          const desc = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
+          if (desc && desc.set) {
+            desc.set.call(element, "");
+          }
+        } catch {}
+
         // Simulate user click & focus on the input element
         try {
           element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, composed: true }));
           element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, composed: true }));
           element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
           element.focus();
-        } catch {}
-
-        // Try document.execCommand to simulate real keyboard text insertion
-        try {
-          if (typeof document !== "undefined" && typeof document.execCommand === "function") {
-            element.focus();
-            element.select();
-            document.execCommand("insertText", false, expectedValue);
-          }
         } catch {}
 
         const descriptor = Object.getOwnPropertyDescriptor(
@@ -195,6 +210,16 @@ export function setNativeValue(
           descriptor.set.call(element, expectedValue);
         } else {
           element.value = expectedValue;
+        }
+
+        // Try document.execCommand only if value isn't registered yet
+        if (element.value !== expectedValue) {
+          try {
+            if (typeof document !== "undefined" && typeof document.execCommand === "function") {
+              element.focus();
+              document.execCommand("insertText", false, expectedValue);
+            }
+          } catch {}
         }
 
         try {
@@ -664,8 +689,8 @@ export function setNativeValue(
       valueRegistered: registered,
       errorCode: registered ? undefined : "FRAMEWORK_BLOCKED",
     };
-  } catch (err) {
-    console.error("setNativeValue encountered an error:", err);
+  } catch (err: any) {
+    console.warn("setNativeValue safe execution warning:", err?.message || err);
     return {
       success: false,
       valueRegistered: false,

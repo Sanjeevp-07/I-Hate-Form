@@ -66,16 +66,17 @@ export function locateElement(
     );
     for (const q of questionContainers) {
       const heading = q.querySelector(
-        '.M7eMe, [role="heading"], .HoPnR, [class*="title"], [class*="label"], div[dir="auto"], span'
+        '.M7eMe, [role="heading"], .HoPnR, legend, label, h1, h2, h3, h4, h5, h6'
       );
       if (heading && heading.textContent) {
         const headingText = heading.textContent.replace(/[*:]/g, "").trim().toLowerCase();
-        if (
-          headingText === cleanTargetLabel ||
-          headingText.includes(cleanTargetLabel) ||
-          cleanTargetLabel.includes(headingText) ||
-          headingText === normalizedTarget
-        ) {
+        const isExactMatch = headingText === cleanTargetLabel || headingText === normalizedTarget;
+        const isPrefixMatch =
+          cleanTargetLabel.length > 8 &&
+          headingText.length > 8 &&
+          (headingText.startsWith(cleanTargetLabel) || cleanTargetLabel.startsWith(headingText));
+
+        if (isExactMatch || isPrefixMatch) {
           const inputInQ = q.querySelector(
             'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]), textarea, select, [role="textbox"], [role="combobox"], [role="radiogroup"], [role="group"]'
           );
