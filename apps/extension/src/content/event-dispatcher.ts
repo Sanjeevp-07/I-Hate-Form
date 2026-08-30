@@ -29,8 +29,8 @@ export function injectGoogleFormsHelperStyles() {
           pointer-events: none !important;
         }
         .CDNmEc .RBEWZc,
-        .CDNmEc .snByac,
-        .CDNmEc div[jsname="ty0drd"] {
+        .CDNmEc div[jsname="ty0drd"],
+        .CDNmEc [role="alert"] {
           display: none !important;
         }
       `;
@@ -92,10 +92,13 @@ export function applyGoogleFormsState(element: HTMLElement, expectedValue: strin
 
     // Remove Google Form error messages ("This is a required question")
     const errorAlerts = questionCard.querySelectorAll(
-      '.RBEWZc, .snByac, .LXRPh, [role="alert"], div[jsname="ty0drd"]'
+      '.RBEWZc, .LXRPh, [role="alert"], div[jsname="ty0drd"]'
     );
     errorAlerts.forEach((ea) => {
-      (ea as HTMLElement).style.display = "none";
+      const txt = (ea.textContent || "").toLowerCase();
+      if (txt.includes("required") || txt.includes("must") || txt.includes("valid") || ea.getAttribute("role") === "alert" || ea.classList.contains("RBEWZc")) {
+        (ea as HTMLElement).style.display = "none";
+      }
     });
   }
 }

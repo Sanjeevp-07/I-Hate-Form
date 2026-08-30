@@ -1,35 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { readDatabase, updateUserProfile, StoredProfile } from "@internship-copilot/database";
+import { getStoredProfileData } from "@/lib/profile-helper";
 
 export async function GET(req: NextRequest) {
   try {
     const sessionUser = await getAuthenticatedUser(req);
+    const profile = await getStoredProfileData(sessionUser?.id || sessionUser?.email);
     const db = readDatabase();
-
-    let user = null;
-    if (sessionUser) {
-      user = db.users[sessionUser.id] || Object.values(db.users).find((u) => u.email.toLowerCase() === sessionUser.email.toLowerCase());
-    }
-
-    if (!user) {
-      // Return first user or default user
-      user = Object.values(db.users)[0];
-    }
-
-    if (user && user.profile) {
-      return NextResponse.json({
-        profile: user.profile,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        },
-      });
-    }
+    const user = sessionUser ? db.users[sessionUser.id] || Object.values(db.users).find((u) => u.email.toLowerCase() === sessionUser.email.toLowerCase()) : Object.values(db.users)[0];
 
     return NextResponse.json({
-      profile: { personal: {}, links: {} },
+      profile,
+      user: {
+        id: user?.id || "user_sanjeev",
+        email: user?.email || "sanjeev1803t@gmail.com",
+        name: user?.name || "Sanjeev Kumar",
+      },
     });
   } catch (err) {
     return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 });

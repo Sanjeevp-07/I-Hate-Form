@@ -238,35 +238,35 @@ export default function ResumesPage() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl space-y-6 animate-pulse">
+      <div className="max-w-6xl space-y-6 animate-pulse">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <div className="h-6 bg-slate-800 rounded w-56"></div>
-            <div className="h-3 bg-slate-800 rounded w-96"></div>
+            <div className="h-6 bg-slate-200 rounded w-56"></div>
+            <div className="h-3 bg-slate-200 rounded w-96"></div>
           </div>
-          <div className="h-9 bg-slate-800 rounded-lg w-32"></div>
+          <div className="h-9 bg-slate-200 rounded-lg w-32"></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="h-44 bg-slate-900 border border-slate-800 rounded-xl"></div>
-          <div className="h-44 bg-slate-900 border border-slate-800 rounded-xl"></div>
+          <div className="h-44 bg-white border border-slate-200 rounded-2xl shadow-sm"></div>
+          <div className="h-44 bg-white border border-slate-200 rounded-2xl shadow-sm"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl space-y-6 pb-12">
+    <div className="max-w-6xl space-y-6 pb-12 text-slate-900">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-white tracking-tight">Resumes & Application Documents</h1>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800/60 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-purple-400" />
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Resumes & Application Documents</h1>
+            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0066FF] border border-blue-200 flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-[#0066FF]" />
               Auto-Upload Enabled
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Category B Document Slots: Whenever an application form requests any specific document (Resume, 10th, 12th, Transcript, Cover Letter), the Chrome Extension automatically uploads the exact matching file.
           </p>
         </div>
@@ -282,7 +282,7 @@ export default function ResumesPage() {
           <button
             onClick={() => generalFileInputRef.current?.click()}
             disabled={uploadingGeneral}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white text-xs font-semibold transition shadow-md shadow-indigo-950/60 disabled:opacity-50 cursor-pointer"
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-[#0066FF] hover:bg-[#0052CC] active:scale-98 text-white text-xs font-semibold transition shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
           >
             {uploadingGeneral ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
             {uploadingGeneral ? "Uploading..." : "Add Additional File"}
@@ -293,29 +293,29 @@ export default function ResumesPage() {
       {/* Status Messages */}
       {message && (
         <div
-          className={`p-3.5 rounded-lg border text-xs flex items-center gap-2.5 ${
+          className={`p-4 rounded-xl border text-xs flex items-center gap-3 shadow-sm ${
             message.type === "success"
-              ? "bg-emerald-950/60 border-emerald-800 text-emerald-300"
-              : "bg-rose-950/60 border-rose-800 text-rose-300"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : "bg-rose-50 border-rose-200 text-rose-800"
           }`}
         >
           {message.type === "success" ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           ) : (
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           )}
-          <span>{message.text}</span>
+          <span className="font-medium">{message.text}</span>
         </div>
       )}
 
       {/* Section: Category B — Dedicated Document Upload Slots */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold text-white uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-            <FileCheck2 className="w-4 h-4 text-indigo-400" />
+          <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <FileCheck2 className="w-4 h-4 text-[#0066FF]" />
             <span>Category B — Dedicated Document Slots</span>
           </h2>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-slate-500 font-medium">
             {documents.length} document{documents.length === 1 ? "" : "s"} ready for autofill
           </span>
         </div>
@@ -330,41 +330,45 @@ export default function ResumesPage() {
             return (
               <div
                 key={def.category}
-                className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
+                className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
                   uploadedDoc
-                    ? "bg-slate-900 border-emerald-800/60 shadow-sm"
-                    : "bg-slate-900/60 border-slate-800 hover:border-slate-700"
+                    ? "bg-white border-emerald-200 shadow-sm"
+                    : "bg-white border-slate-200 hover:border-slate-300 shadow-sm"
                 }`}
               >
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                       <div
-                        className={`p-2 rounded-lg ${
+                        className={`p-2.5 rounded-xl ${
                           uploadedDoc
-                            ? "bg-emerald-950/80 text-emerald-400 border border-emerald-800/60"
-                            : "bg-slate-800 text-slate-400"
+                            ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                            : "bg-slate-100 text-slate-500 border border-slate-200"
                         }`}
                       >
                         <FileText className="w-4 h-4" />
                       </div>
                       <div>
-                        <h3 className="text-xs font-bold text-white tracking-tight">{def.title}</h3>
-                        <span className="text-[10px] text-slate-400">{def.acceptedText}</span>
+                        <h3 className="text-xs font-bold text-slate-900 tracking-tight">{def.title}</h3>
+                        <span className="text-[10px] text-slate-400 font-medium">{def.acceptedText}</span>
                       </div>
                     </div>
-                    <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border ${def.priorityColor}`}>
+                    <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full border ${
+                      def.priority === "Required"
+                        ? "bg-orange-50 text-orange-600 border-orange-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                    }`}>
                       {def.priority}
                     </span>
                   </div>
 
-                  <p className="text-[11px] text-slate-400">{def.description}</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">{def.description}</p>
 
                   {uploadedDoc && (
-                    <div className="mt-2 p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs flex items-center justify-between gap-2">
+                    <div className="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between gap-2">
                       <div className="truncate">
-                        <div className="font-semibold text-emerald-300 truncate text-[11px] flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <div className="font-bold text-emerald-800 truncate text-[11px] flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                           <span>{uploadedDoc.filename}</span>
                         </div>
                         <div className="text-[10px] text-slate-400 mt-0.5">
@@ -376,7 +380,7 @@ export default function ResumesPage() {
                           <button
                             type="button"
                             onClick={() => downloadDocument(uploadedDoc)}
-                            className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+                            className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-900 transition cursor-pointer"
                             title="Download file"
                           >
                             <Download className="w-3.5 h-3.5" />
@@ -385,7 +389,7 @@ export default function ResumesPage() {
                         <button
                           type="button"
                           onClick={() => handleDelete(uploadedDoc.id, uploadedDoc.filename)}
-                          className="p-1.5 rounded hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                          className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition cursor-pointer"
                           title="Delete file"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -395,7 +399,7 @@ export default function ResumesPage() {
                   )}
                 </div>
 
-                <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                   <input
                     type="file"
                     accept={def.accept}
@@ -414,10 +418,10 @@ export default function ResumesPage() {
                     type="button"
                     disabled={isUploadingThis}
                     onClick={() => fileInputRefs.current[def.category]?.click()}
-                    className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer ${
+                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-2xs ${
                       uploadedDoc
-                        ? "bg-slate-800 hover:bg-slate-700 text-slate-200"
-                        : "bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30"
+                        ? "bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200"
+                        : "bg-[#0066FF] hover:bg-[#0052CC] text-white"
                     }`}
                   >
                     {isUploadingThis ? (
@@ -440,19 +444,19 @@ export default function ResumesPage() {
       </div>
 
       {/* Section: All Stored Documents Library */}
-      <div className="pt-4 border-t border-slate-800 space-y-3">
+      <div className="pt-4 border-t border-slate-200 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold text-white uppercase tracking-wider text-slate-300">
+          <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
             Document Library ({documents.length})
           </h2>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-slate-500 font-medium">
             Starred resume is preferred by default on generic form inputs
           </span>
         </div>
 
         {documents.length === 0 ? (
-          <div className="p-8 rounded-xl bg-slate-900 border border-slate-800 text-center text-xs text-slate-400">
-            <FileText className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+          <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center text-xs text-slate-500 shadow-sm">
+            <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
             No documents uploaded yet. Upload your Resume and Marksheets above to enable 1-click auto-upload across internship portals!
           </div>
         ) : (
@@ -460,33 +464,33 @@ export default function ResumesPage() {
             {documents.map((doc) => (
               <div
                 key={doc.id}
-                className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-all ${
+                className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-all ${
                   doc.isPreferred
-                    ? "bg-indigo-950/30 border-indigo-700/60"
-                    : "bg-slate-900 border-slate-800 hover:border-slate-700"
+                    ? "bg-blue-50/60 border-blue-200 shadow-xs"
+                    : "bg-white border-slate-200 hover:border-slate-300 shadow-sm"
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className={`p-2 rounded-lg ${
+                    className={`p-2.5 rounded-xl ${
                       doc.isPreferred
-                        ? "bg-indigo-600 text-white"
-                        : "bg-slate-800 text-slate-400"
+                        ? "bg-[#0066FF] text-white"
+                        : "bg-slate-100 text-slate-500 border border-slate-200"
                     }`}
                   >
                     <FileText className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-white truncate">{doc.filename}</span>
+                      <span className="font-bold text-slate-900 truncate">{doc.filename}</span>
                       {doc.category && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                        <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                           {doc.category}
                         </span>
                       )}
                       {doc.isPreferred && (
-                        <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800/60 flex items-center gap-1">
-                          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                        <span className="text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                          <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
                           Default Resume
                         </span>
                       )}
@@ -502,7 +506,7 @@ export default function ResumesPage() {
                     <button
                       type="button"
                       onClick={() => handleSetPreferred(doc.id)}
-                      className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition cursor-pointer flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 border border-slate-200"
                     >
                       <Star className="w-3 h-3 text-slate-400" />
                       Set as Default
@@ -512,7 +516,7 @@ export default function ResumesPage() {
                     <button
                       type="button"
                       onClick={() => downloadDocument(doc)}
-                      className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer border border-slate-200"
                       title="Download"
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -521,7 +525,7 @@ export default function ResumesPage() {
                   <button
                     type="button"
                     onClick={() => handleDelete(doc.id, doc.filename)}
-                    className="p-1.5 rounded bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition cursor-pointer border border-slate-200"
                     title="Delete"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

@@ -730,9 +730,9 @@ export const App: React.FC = () => {
   // If loading auth
   if (authState.loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-100 p-6 text-center">
-        <RefreshCw className="w-6 h-6 animate-spin text-indigo-400 mb-3" />
-        <p className="text-xs text-slate-400">Verifying session with I Hate Form...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 text-slate-900 p-6 text-center">
+        <RefreshCw className="w-6 h-6 animate-spin text-[#0066FF] mb-3" />
+        <p className="text-xs text-slate-500 font-medium">Verifying session with I Hate Form...</p>
       </div>
     );
   }
@@ -740,33 +740,33 @@ export const App: React.FC = () => {
   // If NOT authenticated, show clean login instruction popup
   if (!authState.authenticated) {
     return (
-      <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 p-4 select-none">
+      <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900 p-4 select-none">
         {/* Header */}
-        <header className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <header className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg border border-indigo-500/30">
+            <div className="p-2 bg-blue-50 text-[#0066FF] rounded-xl border border-blue-200 shadow-xs">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="font-bold text-sm tracking-tight text-white">I Hate Form</h1>
-              <p className="text-[10px] text-slate-400">AI Application Copilot</p>
+              <h1 className="font-bold text-sm tracking-tight text-slate-900">I Hate Form</h1>
+              <p className="text-[10px] text-slate-500 font-medium">AI Application Copilot</p>
             </div>
           </div>
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-950/60 text-rose-400 border border-rose-800/40 text-[10px] font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span>
+          <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
             Not Logged In
           </span>
         </header>
 
         {/* Lock Screen Body */}
         <div className="my-auto py-8 text-center space-y-4">
-          <div className="inline-flex items-center justify-center p-4 bg-indigo-950/40 text-indigo-400 rounded-2xl border border-indigo-800/40 mx-auto">
+          <div className="inline-flex items-center justify-center p-4 bg-blue-50 text-[#0066FF] rounded-2xl border border-blue-200 mx-auto shadow-xs">
             <Lock className="w-8 h-8" />
           </div>
 
           <div className="space-y-1.5">
-            <h2 className="text-base font-semibold text-white">Log In to I Hate Form</h2>
-            <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+            <h2 className="text-base font-bold text-slate-900">Log In to I Hate Form</h2>
+            <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto font-medium">
               Please sign in on the dashboard and configure your profile information to enable autofilling.
             </p>
           </div>
@@ -774,7 +774,7 @@ export const App: React.FC = () => {
           <div className="space-y-2.5 pt-3">
             <button
               onClick={openDashboardLogin}
-              className="w-full py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:scale-98 text-white rounded-lg text-xs font-semibold shadow-md shadow-indigo-950/50 flex items-center justify-center gap-2 cursor-pointer transition"
+              className="w-full py-3 px-4 bg-[#0066FF] hover:bg-[#0052CC] active:scale-98 text-white rounded-full text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer transition"
             >
               <LogIn className="w-4 h-4" />
               Open Dashboard & Sign In
@@ -782,16 +782,16 @@ export const App: React.FC = () => {
 
             <button
               onClick={checkAuthAndFetchProfile}
-              className="w-full py-2 px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition"
+              className="w-full py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition shadow-2xs"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className="w-3.5 h-3.5 text-[#0066FF]" />
               Refresh Login Status
             </button>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="pt-3 border-t border-slate-900 text-center text-[11px] text-slate-500">
+        <div className="pt-3 border-t border-slate-200 text-center text-[11px] text-slate-400 font-medium">
           I Hate Form Cloud Engine • Secure Sync
         </div>
       </div>
@@ -824,16 +824,16 @@ export const App: React.FC = () => {
     : "Sanjeev_Kumar_Resume.pdf");
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 p-4 select-none">
+    <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900 p-4 select-none">
       {/* Header */}
-      <header className="flex items-center justify-between pb-3 border-b border-slate-800">
+      <header className="flex items-center justify-between pb-3 border-b border-slate-200">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg border border-indigo-500/30">
+          <div className="p-2 bg-blue-50 text-[#0066FF] rounded-xl border border-blue-200 shadow-xs">
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-bold text-sm tracking-tight text-white">I Hate Form</h1>
-            <p className="text-[10px] text-slate-400">
+            <h1 className="font-bold text-sm tracking-tight text-slate-900">I Hate Form</h1>
+            <p className="text-[10px] text-slate-500 font-medium truncate max-w-[140px]">
               {authState.user?.name || authState.user?.email}
             </p>
           </div>
@@ -841,9 +841,9 @@ export const App: React.FC = () => {
         <button
           onClick={openDashboardProfile}
           title="Open Dashboard & Manage Resumes"
-          className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-800/40 text-[10px] font-medium transition cursor-pointer"
+          className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold transition cursor-pointer"
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
           Connected
         </button>
       </header>
@@ -853,16 +853,16 @@ export const App: React.FC = () => {
         <button
           onClick={handleScanForm}
           disabled={isScanning}
-          className="flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-800 hover:bg-slate-700 active:scale-98 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 transition cursor-pointer disabled:opacity-50"
+          className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-white hover:bg-slate-100 active:scale-98 text-slate-800 rounded-xl text-xs font-semibold border border-slate-200 transition cursor-pointer shadow-2xs disabled:opacity-50"
         >
-          <Scan className={`w-3.5 h-3.5 ${isScanning ? "animate-spin text-indigo-400" : "text-slate-400"}`} />
+          <Scan className={`w-3.5 h-3.5 ${isScanning ? "animate-spin text-[#0066FF]" : "text-slate-500"}`} />
           <span>{isScanning ? "Scanning..." : "Scan Fields"}</span>
         </button>
 
         <button
           onClick={handleAutofill}
           disabled={isFilling || fields.length === 0}
-          className="flex items-center justify-center gap-1.5 py-2 px-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:scale-98 text-white rounded-lg text-xs font-semibold shadow-md shadow-indigo-950/50 transition cursor-pointer disabled:opacity-50"
+          className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-[#0066FF] hover:bg-[#0052CC] active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition cursor-pointer disabled:opacity-50"
         >
           <Play className={`w-3.5 h-3.5 ${isFilling ? "animate-spin" : "fill-current"}`} />
           <span>{isFilling ? "Autofilling..." : "Autofill Valid"}</span>
@@ -874,10 +874,10 @@ export const App: React.FC = () => {
         <button
           onClick={() => handleGenerateAIAnswers()}
           disabled={isGeneratingAI}
-          className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 bg-gradient-to-r from-violet-700 via-indigo-600 to-cyan-600 hover:from-violet-600 hover:to-cyan-500 active:scale-98 transition text-white rounded-lg text-xs font-semibold shadow-md shadow-indigo-950/50 border border-indigo-400/30 disabled:opacity-50 cursor-pointer"
+          className="w-full mt-2.5 flex items-center justify-center gap-2 py-2.5 px-3 bg-[#0066FF] hover:bg-[#0052CC] active:scale-98 transition text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 border border-blue-400/30 disabled:opacity-50 cursor-pointer"
         >
           <Sparkles className={`w-3.5 h-3.5 ${isGeneratingAI ? "animate-spin text-amber-300" : "text-amber-300 fill-amber-300"}`} />
-          <span>{isGeneratingAI ? "NVIDIA NIM Generating Answers..." : "Auto-Generate with NVIDIA AI"}</span>
+          <span>{isGeneratingAI ? "NVIDIA NIM Generating Answers..." : "Auto-Generate with AI"}</span>
         </button>
       )}
 
@@ -885,13 +885,13 @@ export const App: React.FC = () => {
       {fields.length > 0 && (
         <div className="mt-2.5 flex items-center gap-1.5 flex-wrap text-[11px]">
           {iframeFieldsCount > 0 && (
-            <div className="flex items-center gap-1 px-2 py-0.5 bg-purple-950/50 text-purple-300 border border-purple-800/40 rounded-md">
+            <div className="flex items-center gap-1 px-2.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-full font-semibold">
               <Layers className="w-3 h-3" />
               <span>{iframeFieldsCount} iframe fields</span>
             </div>
           )}
           {closedRootsCount > 0 && (
-            <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-950/50 text-amber-300 border border-amber-800/40 rounded-md">
+            <div className="flex items-center gap-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-semibold">
               <AlertCircle className="w-3 h-3" />
               <span>{closedRootsCount} closed shadow root</span>
             </div>
@@ -901,36 +901,36 @@ export const App: React.FC = () => {
 
       {/* Summary Metrics */}
       {fields.length > 0 && (
-        <div className="grid grid-cols-4 gap-1.5 mt-2.5 text-center">
-          <div className="p-1.5 bg-emerald-950/30 border border-emerald-900/40 rounded-lg">
-            <div className="text-sm font-bold text-emerald-400">{highConfidenceCount}</div>
-            <div className="text-[10px] text-emerald-500 uppercase tracking-wider">Ready</div>
+        <div className="grid grid-cols-4 gap-2 mt-3 text-center">
+          <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-xl shadow-2xs">
+            <div className="text-sm font-extrabold text-emerald-700">{highConfidenceCount}</div>
+            <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Ready</div>
           </div>
-          <div className="p-1.5 bg-amber-950/30 border border-amber-900/40 rounded-lg">
-            <div className="text-sm font-bold text-amber-400">{reviewCount}</div>
-            <div className="text-[10px] text-amber-500 uppercase tracking-wider">Review</div>
+          <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl shadow-2xs">
+            <div className="text-sm font-extrabold text-amber-700">{reviewCount}</div>
+            <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Review</div>
           </div>
-          <div className="p-1.5 bg-blue-950/30 border border-blue-900/40 rounded-lg">
-            <div className="text-sm font-bold text-blue-400">{askCount}</div>
-            <div className="text-[10px] text-blue-500 uppercase tracking-wider">Ask</div>
+          <div className="p-2 bg-blue-50 border border-blue-200 rounded-xl shadow-2xs">
+            <div className="text-sm font-extrabold text-blue-700">{askCount}</div>
+            <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Ask</div>
           </div>
-          <div className="p-1.5 bg-rose-950/30 border border-rose-900/40 rounded-lg">
-            <div className="text-sm font-bold text-rose-400">{unsupportedCount}</div>
-            <div className="text-[10px] text-rose-500 uppercase tracking-wider">Skip</div>
+          <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl shadow-2xs">
+            <div className="text-sm font-extrabold text-rose-700">{unsupportedCount}</div>
+            <div className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Skip</div>
           </div>
         </div>
       )}
 
       {/* Resume PDF Auto-Upload Indicator */}
       {hasResumeField && (
-        <div className="mt-2.5 p-2 bg-indigo-950/40 border border-indigo-800/40 rounded-lg text-xs flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-indigo-300 font-medium truncate flex-1">
-            <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+        <div className="mt-3 p-3 bg-white border border-slate-200 rounded-xl text-xs flex items-center justify-between gap-2 shadow-sm">
+          <div className="flex items-center gap-1.5 text-slate-800 font-semibold truncate flex-1">
+            <FileText className="w-3.5 h-3.5 text-[#0066FF] shrink-0" />
             <span className="truncate">
               {activeResumeDisplayName}
             </span>
             {savedResume && (
-              <span className="px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 text-[9px] font-bold shrink-0">
+              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold shrink-0">
                 DB Resume
               </span>
             )}
@@ -938,7 +938,7 @@ export const App: React.FC = () => {
           <button
             onClick={handleUploadResumeOnly}
             disabled={isUploadingResume}
-            className="text-[10px] px-2 py-0.5 bg-indigo-900/70 hover:bg-indigo-800 active:scale-95 text-indigo-200 border border-indigo-700/50 rounded font-medium shrink-0 cursor-pointer transition flex items-center gap-1"
+            className="text-[10px] px-2.5 py-1 bg-blue-50 hover:bg-blue-100 active:scale-95 text-[#0066FF] border border-blue-200 rounded-full font-bold shrink-0 cursor-pointer transition flex items-center gap-1"
           >
             <Upload className="w-3 h-3" />
             <span>{isUploadingResume ? "Uploading..." : "Upload Resume"}</span>
@@ -948,29 +948,29 @@ export const App: React.FC = () => {
 
       {/* Fill Summary Alert */}
       {fillSummary && (
-        <div className="mt-2.5 p-2.5 bg-emerald-950/50 border border-emerald-800/50 rounded-lg text-xs space-y-1.5 text-emerald-300">
+        <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-1.5 text-emerald-900 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 font-medium">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <div className="flex items-center gap-1.5 font-bold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               <span>Autofilled {fillSummary.filled} fields</span>
             </div>
-            <span className="text-slate-400">({fillSummary.skipped} skipped)</span>
+            <span className="text-slate-500 font-medium">({fillSummary.skipped} skipped)</span>
           </div>
           {fillSummary.resumeUploaded && (
-            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400/90 pl-5">
-              <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 pl-5 font-semibold">
+              <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span>Resume PDF "{fillSummary.resumeName}" uploaded</span>
             </div>
           )}
           {fillSummary.corrections && fillSummary.corrections.length > 0 && (
-            <div className="mt-1.5 pt-1.5 border-t border-emerald-800/40 text-[11px] space-y-1 text-cyan-300">
-              <div className="flex items-center gap-1.5 font-medium text-cyan-400">
-                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            <div className="mt-2 pt-2 border-t border-emerald-200 text-[11px] space-y-1 text-slate-800">
+              <div className="flex items-center gap-1.5 font-bold text-blue-700">
+                <Sparkles className="w-3.5 h-3.5 shrink-0 text-[#0066FF]" />
                 <span>Auto-corrected {fillSummary.corrections.length} field {fillSummary.corrections.length === 1 ? "warning" : "warnings"} with NVIDIA AI:</span>
               </div>
               {fillSummary.corrections.map((c, i) => (
-                <div key={i} className="pl-5 text-slate-300">
-                  • <strong className="text-white">{c.rawLabel || "Field"}</strong>: <span className="line-through text-slate-500">{String(c.previousValue)}</span> &rarr; <span className="font-semibold text-emerald-300">{String(c.correctedValue)}</span> <span className="text-[10px] text-amber-400/80">({c.warningMessage})</span>
+                <div key={i} className="pl-5 text-slate-700 font-medium">
+                  • <strong className="text-slate-900">{c.rawLabel || "Field"}</strong>: <span className="line-through text-slate-400">{String(c.previousValue)}</span> &rarr; <span className="font-bold text-emerald-700">{String(c.correctedValue)}</span> <span className="text-[10px] text-amber-700 font-semibold">({c.warningMessage})</span>
                 </div>
               ))}
             </div>
@@ -980,13 +980,13 @@ export const App: React.FC = () => {
 
       {/* Error Warnings */}
       {errors.length > 0 && (
-        <div className="mt-2.5 p-2.5 bg-amber-950/50 border border-amber-800/50 rounded-lg text-xs space-y-1">
-          <div className="font-medium text-amber-300 flex items-center gap-1">
-            <AlertCircle className="w-3.5 h-3.5" />
+        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-1 shadow-sm">
+          <div className="font-bold text-amber-800 flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
             <span>Manual Confirmation Needed:</span>
           </div>
           {errors.map((err, i) => (
-            <p key={i} className="text-[11px] text-amber-400/90 pl-4">
+            <p key={i} className="text-[11px] text-amber-700 pl-5 font-medium">
               • {err.message}
             </p>
           ))}
@@ -995,16 +995,16 @@ export const App: React.FC = () => {
 
       {/* Detected Field List */}
       <div className="mt-3 flex-1 flex flex-col min-h-0">
-        <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+        <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-2">
           <span>Detected Fields ({fields.length})</span>
           <span>Fill Preview</span>
         </div>
 
         {fields.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-xl p-6 text-center text-slate-500">
-            <Shield className="w-8 h-8 mb-2 stroke-1 text-slate-600" />
-            <p className="text-xs">No active scan</p>
-            <p className="text-[11px] text-slate-600 mt-1">
+          <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 bg-white rounded-2xl p-6 text-center text-slate-400 shadow-2xs">
+            <Shield className="w-8 h-8 mb-2 stroke-1 text-slate-300" />
+            <p className="text-xs font-semibold text-slate-600">No active scan</p>
+            <p className="text-[11px] text-slate-400 mt-1 font-medium">
               Click "Scan Fields" on any job application form
             </p>
           </div>
@@ -1021,26 +1021,26 @@ export const App: React.FC = () => {
               return (
                 <div
                   key={field.id}
-                  className="p-2.5 bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs transition"
+                  className="p-3 bg-white border border-slate-200 rounded-2xl text-xs transition shadow-2xs space-y-2"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="font-medium text-slate-200 truncate flex-1 flex items-center gap-1.5">
+                    <div className="font-bold text-slate-900 truncate flex-1 flex items-center gap-1.5">
                       <span>{field.rawLabel || field.name || "Unnamed field"}</span>
                       {isAIMapped && (
-                        <span className="text-[9px] px-1 py-0.2 bg-violet-950/80 text-violet-300 border border-violet-700/50 rounded font-semibold uppercase tracking-wider">
+                        <span className="text-[9px] px-1.5 py-0.5 bg-blue-50 text-[#0066FF] border border-blue-200 rounded-full font-bold uppercase tracking-wider">
                           NVIDIA NIM
                         </span>
                       )}
                     </div>
                     <span
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-medium ${
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                         confidence >= 0.9
-                          ? "bg-emerald-950/60 text-emerald-400 border border-emerald-800/40"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                           : confidence >= 0.7
-                          ? "bg-amber-950/60 text-amber-400 border border-amber-800/40"
+                          ? "bg-amber-50 text-amber-700 border border-amber-200"
                           : confidence >= 0.4
-                          ? "bg-blue-950/60 text-blue-400 border border-blue-800/40"
-                          : "bg-rose-950/60 text-rose-400 border border-rose-800/40"
+                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                          : "bg-rose-50 text-rose-700 border border-rose-200"
                       }`}
                     >
                       {Math.round(confidence * 100)}%
@@ -1049,18 +1049,18 @@ export const App: React.FC = () => {
 
                   {/* File Upload Field Display */}
                   {field.type === "file" && (
-                    <div className="mt-1.5 p-2 bg-indigo-950/30 border border-indigo-800/40 rounded-lg flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 text-indigo-300 font-mono text-[11px] truncate flex-1">
-                        <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <div className="p-2 bg-blue-50/50 border border-blue-200 rounded-xl flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-blue-800 font-semibold text-[11px] truncate flex-1">
+                        <FileText className="w-3.5 h-3.5 text-[#0066FF] shrink-0" />
                         <span className="truncate">{String(valueToFill || activeResumeDisplayName)}</span>
-                        <span className="px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 text-[9px] font-bold shrink-0">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold shrink-0">
                           Ready
                         </span>
                       </div>
                       <button
                         onClick={handleUploadResumeOnly}
                         disabled={isUploadingResume}
-                        className="text-[10px] px-2 py-0.5 bg-indigo-900/70 hover:bg-indigo-800 active:scale-95 text-indigo-200 border border-indigo-700/50 rounded font-medium shrink-0 cursor-pointer transition flex items-center gap-1"
+                        className="text-[10px] px-2.5 py-1 bg-white hover:bg-slate-50 text-[#0066FF] border border-blue-200 rounded-full font-bold shrink-0 cursor-pointer transition flex items-center gap-1"
                       >
                         <Upload className="w-3 h-3" />
                         <span>{isUploadingResume ? "Uploading..." : "Upload"}</span>
@@ -1070,10 +1070,10 @@ export const App: React.FC = () => {
 
                   {/* Text / Number Input Editable Field */}
                   {field.type !== "select" && field.type !== "file" && (
-                    <div className="mt-1.5">
+                    <div>
                       <input
                         type="text"
-                        className="w-full bg-slate-950/90 text-emerald-300 border border-slate-700/70 rounded px-2 py-1 text-[11px] font-mono focus:border-indigo-500 focus:outline-none"
+                        className="w-full bg-white text-slate-900 border border-slate-200 rounded-xl px-3 py-1.5 text-[11px] font-medium focus:border-[#0066FF] focus:outline-none"
                         placeholder="No saved value"
                         value={valueToFill !== null && valueToFill !== undefined ? String(valueToFill) : ""}
                         onChange={(e) => handleValueChange(idx, e.target.value)}
@@ -1083,13 +1083,13 @@ export const App: React.FC = () => {
 
                   {/* Dropdown / Radio Options Selector */}
                   {(field.type === "select" || field.type === "radio") && field.options && field.options.length > 0 && (
-                    <div className="mt-2 pt-1.5 border-t border-slate-800/60">
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                    <div className="pt-1.5 border-t border-slate-100">
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold mb-1">
                         <span>{field.type === "radio" ? "Radio Options" : "Dropdown Options"} ({field.options.length}):</span>
                       </div>
                       <div className="relative">
                         <select
-                          className="w-full bg-slate-950/80 hover:bg-slate-950 text-slate-200 border border-slate-700/80 rounded px-2 py-1 text-[11px] appearance-none cursor-pointer focus:border-indigo-500 focus:outline-none pr-6 truncate"
+                          className="w-full bg-white text-slate-800 border border-slate-200 rounded-xl px-3 py-1.5 text-[11px] appearance-none cursor-pointer focus:border-[#0066FF] focus:outline-none pr-6 truncate font-medium"
                           value={
                             field.options.find(
                               (opt) =>
@@ -1111,19 +1111,19 @@ export const App: React.FC = () => {
                             </option>
                           ))}
                         </select>
-                        <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-2 pointer-events-none" />
+                        <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
                       </div>
                     </div>
                   )}
 
                   {/* Multi-Select Checkbox Options Selector */}
                   {field.type === "checkbox" && field.options && field.options.length > 0 && (
-                    <div className="mt-2 pt-1.5 border-t border-slate-800/60">
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1.5">
+                    <div className="pt-1.5 border-t border-slate-100">
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold mb-1.5">
                         <span>Select Choices ({field.options.length} options):</span>
-                        <span className="text-[9px] text-indigo-400">Click to toggle</span>
+                        <span className="text-[9px] text-[#0066FF]">Click to toggle</span>
                       </div>
-                      <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto custom-scrollbar p-1.5 bg-slate-950/70 rounded-lg border border-slate-800/60">
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto custom-scrollbar p-2 bg-slate-50 rounded-xl border border-slate-200">
                         {field.options.map((opt, optIdx) => {
                           const isSelected = String(valueToFill || "")
                             .toLowerCase()
@@ -1136,13 +1136,13 @@ export const App: React.FC = () => {
                               key={optIdx}
                               type="button"
                               onClick={() => handleToggleCheckboxOption(idx, opt.label || opt.value)}
-                              className={`text-[10px] px-2 py-0.5 rounded border transition flex items-center gap-1 cursor-pointer select-none ${
+                              className={`text-[10px] px-2.5 py-1 rounded-full border transition flex items-center gap-1.5 cursor-pointer select-none ${
                                 isSelected
-                                  ? "bg-emerald-950/90 text-emerald-300 border-emerald-600/80 font-medium shadow-sm shadow-emerald-950"
-                                  : "bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800"
+                                  ? "bg-blue-50 text-[#0066FF] border-[#0066FF] font-bold shadow-2xs"
+                                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 font-medium"
                               }`}
                             >
-                              <span className={`w-2.5 h-2.5 rounded-sm border flex items-center justify-center text-[8px] font-bold ${isSelected ? "border-emerald-400 bg-emerald-500 text-slate-950" : "border-slate-600"}`}>
+                              <span className={`w-2.5 h-2.5 rounded-full border flex items-center justify-center text-[8px] font-bold ${isSelected ? "border-[#0066FF] bg-[#0066FF] text-white" : "border-slate-300"}`}>
                                 {isSelected ? "✓" : ""}
                               </span>
                               <span>{opt.label || opt.value}</span>

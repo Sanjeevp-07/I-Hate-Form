@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid resume match payload", details: parsed.error.format() }, { status: 400 });
     }
 
-    const mockResumes = parsed.data.resumeDocumentIds.map((id, index) => ({
+    const mockResumes = parsed.data.resumeDocumentIds.map((id: string, index: number) => ({
       id,
       filename: `Resume_${index + 1}.pdf`,
       tags: index === 0 ? ["fullstack", "typescript", "react"] : ["ml", "python", "ai"],
